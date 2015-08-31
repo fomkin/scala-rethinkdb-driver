@@ -26,10 +26,6 @@ lazy val `akka-reql` = project.
   settings(commonSettings:_*).
   settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.3.7",
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
-      // Temp
-      "ch.qos.logback" % "logback-core" % "1.1.3",
-      "ch.qos.logback" % "logback-classic" % "1.1.3"
+      "com.typesafe.akka" %% "akka-actor" % "2.3.7"
     )
   )
