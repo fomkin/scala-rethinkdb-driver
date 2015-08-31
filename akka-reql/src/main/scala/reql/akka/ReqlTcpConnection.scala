@@ -1,4 +1,4 @@
-package reql
+package reql.akka
 
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
