@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import akka.actor.{Actor, ActorRef, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
-import reql.dsl.Json
+import reql.dsl.{ReqlArg, Json}
 import reql.protocol._
 
 class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
@@ -46,9 +46,9 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
   def receive: Receive = connecting
 
   def connecting: Receive = {
-    case StartQuery(json) ⇒
+    case StartQuery(arg) ⇒
       context watch sender()
-      pendingQueries ::= (sender(), json)
+      pendingQueries ::= (sender(), arg.ast)
     case c: Tcp.Connected ⇒
       val handshakeBuffer = createHandshakeBuffer(authKey)
       val connection = sender()
@@ -69,12 +69,11 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
 
   def operating: Receive = {
     case c: StartQuery ⇒
-      queries(startQuery(c.data)) = sender()
+      queries(startQuery(c.data.ast)) = sender()
       context watch sender()
     case StopQuery(queryToken) ⇒
       queries.remove(queryToken) foreach { refToUnwatch ⇒
-        val exists = queries.exists { case (k, v) ⇒ v == refToUnwatch }
-        if (!exists) context unwatch refToUnwatch
+        tryToUnwatchListener(refToUnwatch)
       }
     case Tcp.Received(data) ⇒
       processData(data.asByteBuffer)
@@ -82,7 +81,7 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
       tcpConnection foreach (_ ! Tcp.ResumeReading)
   }
 
-  override def unhandled(message: Any): Unit = {
+  override def unhandled(message: Any): Unit = message match {
     case Terminated(tcp) if tcpConnection.contains(tcp) ⇒
       context stop self
     case Terminated(subject) ⇒
@@ -90,6 +89,12 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
       pendingQueries = pendingQueries filter {
         case (ref, _) ⇒ ref != subject
       }
+    case x ⇒ super.unhandled(x)
+  }
+
+  def tryToUnwatchListener(refToUnwatch: ActorRef): Unit = {
+    val exists = queries.exists { case (k, v) ⇒ v == refToUnwatch }
+    if (!exists) context unwatch refToUnwatch
   }
 
   //---------------------------------------------------------------------------
@@ -109,8 +114,12 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
   protected def onResponse(queryToken: Long, responseType: ReqlResponseType, json: Json): Unit = {
     queries.get(queryToken) foreach { ref ⇒
       ref ! Response(queryToken, responseType, json)
-      if (responseType == ReqlResponseType.SuccessSequence)
+      if (responseType != ReqlResponseType.SuccessPartial) {
+        queries.remove(queryToken)
+        tryToUnwatchListener(ref)
+      } else {
         continueQuery(queryToken)
+      }
     }
   }
 }
@@ -129,5 +138,5 @@ object ReqlTcpConnection {
 
   case class StopQuery(queryToken: Long) extends ReqlConnectionCommand
 
-  case class StartQuery(data: Json) extends ReqlConnectionCommand
+  case class StartQuery(data: ReqlArg) extends ReqlConnectionCommand
 }

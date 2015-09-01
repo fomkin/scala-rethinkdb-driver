@@ -52,7 +52,10 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
           val ccName = nameToCamelCase(name)
           s"$ccName.ast"
       }
-      if (hasDep) "self.ast, " + xs.mkString(", ")
+      if (hasDep) {
+        if (xs.isEmpty) "self.ast"
+        else "self.ast, " + xs.mkString(", ")
+      }
       else xs.mkString(", ")
     }
     val opts = {
@@ -153,7 +156,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |import reql.dsl.types._
          |import pushka.Ast
          |
-         |trait BaseOps {
+         |class BaseOps {
          |$funDefs
          |}
      """.stripMargin

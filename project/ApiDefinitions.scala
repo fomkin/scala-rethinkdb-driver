@@ -82,6 +82,10 @@ object ApiDefinitions {
     module(termType = 145, name = "sum")(Top.Sequence)(groupedFunctions: _*),
     module(termType = 146, name = "avg")(Top.Sequence)(groupedFunctions: _*),
     module(termType = 147, name = "min")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 148, name = "max")(Top.Sequence)(groupedFunctions: _*)
+    module(termType = 148, name = "max")(Top.Sequence)(groupedFunctions: _*),
+
+    module(termType = 152, name = "changes")(Top.Sequence.Stream)(
+      fun(Top.Sequence.Table)()
+    )
   )
 }

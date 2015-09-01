@@ -14,6 +14,7 @@ val commonSettings = Seq(
 val `scala-reql-core` = crossProject.crossType(CrossType.Pure).
   settings(commonSettings:_*).
   settings(
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full),
     sourceGenerators in Compile <+= sourceManaged in Compile map ApiGenerator
   ).
   settings(libraryDependencies += "com.github.fomkin" %%% "pushka-json" % "0.3.0-SNAPSHOT")

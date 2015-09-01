@@ -64,48 +64,64 @@ trait ReqlConnection {
    * @param data Raw data from connection
    */
   protected def processData(data: ByteBuffer): Unit = {
-    @tailrec
-    def loop(): Unit = {
-      // Enough for header
-      if (buffer.limit >= HeaderSize) {
-        val queryToken = buffer.getLong(0)
-        val responseLength = buffer.getInt(8)
-        val messageSize = HeaderSize + responseLength
-        // Enough for body
-        if (buffer.limit >= messageSize) {
-          val jsonBuffer = ByteBuffer.allocate(responseLength)
-          val tailSize = buffer.limit - messageSize
-          buffer.position(HeaderSize)
-          processResponse(queryToken, jsonBuffer.put(buffer))
-          if (tailSize > 0) {
-            val newBuffer = ByteBuffer.allocate(tailSize)
-            buffer.position(messageSize)
-            buffer = newBuffer.put(buffer)
-            loop()
-          }
-          else {
-            buffer.clear()
-          }
-        }
-      }
-    }
     // Update buffer
     buffer.position(0)
-    buffer = ByteBuffer.allocate(buffer.limit + data.limit).
-      order(ByteOrder.LITTLE_ENDIAN).
+    buffer = ByteBuffer.allocate(buffer.capacity + data.capacity).
       put(buffer).
       put(data)
+    processData()
+  }
+
+  @tailrec
+  final protected def processData(): Unit = {
+    buffer.position(0)
+    buffer.order(ByteOrder.LITTLE_ENDIAN)
     // Process data
     (state: @switch) match {
-      case Processing ⇒ loop()
-      case Handshake if buffer.get(buffer.limit - 1) == 0 ⇒
-        val asciiString = new String(buffer.array(), StandardCharsets.US_ASCII)
-        asciiString.trim match {
-          case "SUCCESS" ⇒ state = Processing
-          case res if res.startsWith("ERROR: ") ⇒
-            val s = asciiString.stripPrefix("ERROR: ")
-            onFatalError(s"Handshake fails with: '$s'")
-          case s ⇒ onFatalError("Unexpected handshake result: '$s'")
+      case Processing ⇒
+        // Enough for header
+        if (buffer.capacity >= HeaderSize) {
+          val queryToken = buffer.getLong(0)
+          val responseLength = buffer.getInt(8)
+          val messageSize = HeaderSize + responseLength
+          println(s"Header: queryToken=$queryToken, responseLength=$responseLength, messageSize=$messageSize")
+          // Enough for body
+          if (buffer.capacity >= messageSize) {
+            val jsonBytes = new Array[Byte](responseLength)
+            buffer.position(HeaderSize)
+            buffer.get(jsonBytes)
+            // Truncate buffer
+            buffer.position(messageSize)
+            buffer = buffer.slice()
+            // Process response
+            processResponse(queryToken, jsonBytes)
+            processData()
+          }
+        }
+      case Handshake ⇒
+        val zeroByteIndex = 0 until buffer.capacity indexWhere { i ⇒
+          buffer.get(i) == 0
+        }
+        if (zeroByteIndex > -1) {
+          val messageArray = new Array[Byte](zeroByteIndex)
+          val messageSize = zeroByteIndex + 1
+          buffer.position(0)
+          buffer.get(messageArray, 0, zeroByteIndex)
+          buffer.position(messageSize)
+          buffer = buffer.slice()
+          val asciiString = new String(
+            messageArray,
+            StandardCharsets.US_ASCII
+          )
+          asciiString match {
+            case "SUCCESS" ⇒
+              state = Processing
+              processData()
+            case res if res.startsWith("ERROR: ") ⇒
+              val s = asciiString.stripPrefix("ERROR: ")
+              onFatalError(s"Handshake fails with: '$s'")
+            case s ⇒ onFatalError(s"Unexpected handshake result: '$s'")
+          }
         }
     }
   }
@@ -124,7 +140,7 @@ trait ReqlConnection {
       buffer.position(0)
       buffer
     }
-    val buffer = ByteBuffer.allocate(authKeyBuffer.limit + 8).
+    val buffer = ByteBuffer.allocate(authKeyBuffer.capacity + 8).
       order(ByteOrder.LITTLE_ENDIAN).
       putInt(version.value).
       put(authKeyBuffer).
@@ -146,26 +162,25 @@ trait ReqlConnection {
   private[this] var buffer: ByteBuffer = ByteBuffer.allocate(0)
 
   private[this] def send(token: Long, data: ByteBuffer): Unit = {
+    data.position(0)
     val buffer = ByteBuffer.
-      allocate(HeaderSize + data.limit).
+      allocate(HeaderSize + data.capacity).
       order(ByteOrder.LITTLE_ENDIAN).
       putLong(token).
-      putInt(data.limit).
+      putInt(data.capacity).
       put(data)
     buffer.position(0)
     sendBytes(buffer)
   }
 
-  private[this] def processResponse(token: Long, data: ByteBuffer): Unit = {
-
+  private[this] def processResponse(token: Long, data: Array[Byte]): Unit = {
     import ReqlResponseType._
-    val utfString = new String(data.array(), StandardCharsets.UTF_8)
+    val utfString = new String(data, StandardCharsets.UTF_8)
     val responseWrapper = readJson[ResponseWrapper](utfString)
-
     onResponse(
       queryToken = token,
       json = responseWrapper.r,
-      responseType = (responseWrapper.t: @switch) match {
+      responseType = responseWrapper.t match {
         case ClientError.value ⇒ ClientError
         case CompileError.value ⇒ CompileError
         case RuntimeError.value ⇒ RuntimeError
@@ -173,6 +188,7 @@ trait ReqlConnection {
         case SuccessPartial.value ⇒ SuccessPartial
         case SuccessSequence.value ⇒ SuccessSequence
         case WaitComplete.value ⇒ WaitComplete
+        case _ ⇒ UnknownError
       }
     )
   }

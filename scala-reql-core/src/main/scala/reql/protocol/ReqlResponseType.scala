@@ -52,4 +52,5 @@ object ReqlResponseType {
    */
   case object RuntimeError extends ReqlResponseType(18)
 
+  case object UnknownError extends ReqlResponseType(-1)
 }

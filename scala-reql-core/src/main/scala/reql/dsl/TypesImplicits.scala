@@ -2,6 +2,8 @@ package reql.dsl
 
 import pushka.Ast
 
+import scala.language.implicitConversions
+
 trait TypesImplicits {
 
   implicit def toStr(value: String): types.Str = new types.Str {
