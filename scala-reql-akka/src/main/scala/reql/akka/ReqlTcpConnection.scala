@@ -3,22 +3,22 @@ package reql.akka
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Terminated, Actor, ActorRef}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
-import reql.dsl.{ReqlArg, Json}
+import reql.dsl.ReqlArg
 import reql.protocol._
 
-class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
-                        authKey: Option[String] = None)
+abstract class ReqlTcpConnection[Json](remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
+                                       authKey: Option[String] = None)
 
-  extends Actor with ReqlConnection {
+  extends Actor with ReqlConnection[Json] {
 
   /**
    * _1: Sender of query. Receiver of response
    * _2: Request body
    */
-  type Query = (ActorRef, Json)
+  type Query = (ActorRef, ReqlArg)
 
   import ReqlTcpConnection._
   import context.system
@@ -48,7 +48,7 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
   def connecting: Receive = {
     case StartQuery(arg) ⇒
       context watch sender()
-      pendingQueries ::= (sender(), arg.ast)
+      pendingQueries ::=(sender(), arg)
     case c: Tcp.Connected ⇒
       val handshakeBuffer = createHandshakeBuffer(authKey)
       val connection = sender()
@@ -69,7 +69,7 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
 
   def operating: Receive = {
     case c: StartQuery ⇒
-      queries(startQuery(c.data.ast)) = sender()
+      queries(startQuery(c.arg)) = sender()
       context watch sender()
     case StopQuery(queryToken) ⇒
       queries.remove(queryToken) foreach { refToUnwatch ⇒
@@ -111,14 +111,14 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
     context stop self
   }
 
-  protected def onResponse(queryToken: Long, responseType: ReqlResponseType, json: Json): Unit = {
+  protected def onResponse(queryToken: Long,
+                           tpe: ReqlResponseType,
+                           data: Json): Unit = {
     queries.get(queryToken) foreach { ref ⇒
-      ref ! Response(queryToken, responseType, json)
-      if (responseType != ReqlResponseType.SuccessPartial) {
+      ref ! ReqlTcpConnection.Response[Json](queryToken, tpe, data)
+      if (tpe != ReqlResponseType.SuccessPartial) {
         queries.remove(queryToken)
         tryToUnwatchListener(ref)
-      } else {
-        continueQuery(queryToken)
       }
     }
   }
@@ -132,11 +132,12 @@ object ReqlTcpConnection {
 
   sealed trait ReqlConnectionCommand
 
-  case class Response(queryToken: Long,
-                      reqlResponseType: ReqlResponseType,
-                      json: Json) extends ReqlConnectionEvent
+  case class Response[Json](queryToken: Long,
+                            tpe: ReqlResponseType,
+                            data: Json) extends ReqlConnectionEvent
 
   case class StopQuery(queryToken: Long) extends ReqlConnectionCommand
 
-  case class StartQuery(data: ReqlArg) extends ReqlConnectionCommand
+  case class StartQuery(arg: ReqlArg) extends ReqlConnectionCommand
+
 }

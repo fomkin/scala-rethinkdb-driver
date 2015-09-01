@@ -4,9 +4,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.{ByteBuffer, ByteOrder}
 import java.util.concurrent.atomic.AtomicLong
 
-import pushka.annotation.pushka
-import pushka.json.{read => readJson, write => writeJson, _}
-import reql.dsl.Json
+import reql.dsl.ReqlArg
 
 import scala.annotation.{switch, tailrec}
 
@@ -14,7 +12,7 @@ import scala.annotation.{switch, tailrec}
  * See specification at
  * http://www.rethinkdb.com/docs/writing-drivers/
  */
-trait ReqlConnection {
+trait ReqlConnection[Json] {
 
   import ReqlConnection._
 
@@ -28,13 +26,10 @@ trait ReqlConnection {
    * @param data Prepared query
    * @return Query unique token
    */
-  def startQuery(data: Json): Long = {
+  def startQuery(data: ReqlArg): Long = {
     val token = tokenFactory.incrementAndGet()
-    val json = Json.Arr(Seq(
-      Json.Num(ReqlQueryType.Start.value),
-      data
-    ))
-    val jsonBuffer = ByteBuffer.wrap(writeJson(json).getBytes("UTF-8"))
+    val json = s"[${ReqlQueryType.Start.value}, ${data.json}]"
+    val jsonBuffer = ByteBuffer.wrap(json.getBytes("UTF-8"))
     send(token, jsonBuffer)
     token
   }
@@ -49,13 +44,15 @@ trait ReqlConnection {
   //
   //---------------------------------------------------------------------------
 
+  protected case class Response(t: Int, r: Json)
+
   protected def sendBytes(data: ByteBuffer): Unit
 
   protected def onFatalError(message: String): Unit
 
-  protected def onResponse(queryToken: Long,
-                           responseType: ReqlResponseType,
-                           json: Json): Unit
+  protected def onResponse(queryToken: Long, tpe: ReqlResponseType, data: Json): Unit
+
+  protected def parseResponse(s: String): Response
 
   /**
    * Process data from RethinkDB server when connection
@@ -84,7 +81,7 @@ trait ReqlConnection {
           val queryToken = buffer.getLong(0)
           val responseLength = buffer.getInt(8)
           val messageSize = HeaderSize + responseLength
-          println(s"Header: queryToken=$queryToken, responseLength=$responseLength, messageSize=$messageSize")
+          //println(s"Header: queryToken=$queryToken, responseLength=$responseLength, messageSize=$messageSize")
           // Enough for body
           if (buffer.capacity >= messageSize) {
             val jsonBytes = new Array[Byte](responseLength)
@@ -174,30 +171,20 @@ trait ReqlConnection {
   }
 
   private[this] def processResponse(token: Long, data: Array[Byte]): Unit = {
-    import ReqlResponseType._
-    val utfString = new String(data, StandardCharsets.UTF_8)
-    val responseWrapper = readJson[ResponseWrapper](utfString)
+    val response = parseResponse(new String(data, StandardCharsets.UTF_8))
+    val t = ReqlResponseType.matchType(response.t)
+    if (t == ReqlResponseType.SuccessPartial) {
+      continueQuery(token)
+    }
     onResponse(
       queryToken = token,
-      json = responseWrapper.r,
-      responseType = responseWrapper.t match {
-        case ClientError.value ⇒ ClientError
-        case CompileError.value ⇒ CompileError
-        case RuntimeError.value ⇒ RuntimeError
-        case SuccessAtom.value ⇒ SuccessAtom
-        case SuccessPartial.value ⇒ SuccessPartial
-        case SuccessSequence.value ⇒ SuccessSequence
-        case WaitComplete.value ⇒ WaitComplete
-        case _ ⇒ UnknownError
-      }
+      tpe = t,
+      data = response.r
     )
   }
 }
 
 private object ReqlConnection {
-
-  @pushka
-  case class ResponseWrapper(t: Int, r: Json)
 
   val Handshake = 0
 
@@ -209,4 +196,3 @@ private object ReqlConnection {
 
   val StopBuffer = ByteBuffer.wrap("[3]".getBytes("UTF-8"))
 }
-

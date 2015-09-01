@@ -50,19 +50,19 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       val xs = func.args.collect {
         case arg(name, _) ⇒
           val ccName = nameToCamelCase(name)
-          s"$ccName.ast"
+          "${" + ccName + ".json}"
       }
       if (hasDep) {
-        if (xs.isEmpty) "self.ast"
-        else "self.ast, " + xs.mkString(", ")
+        if (xs.isEmpty) "${self.json}"
+        else "${self.json}, " + xs.mkString(", ")
       }
       else xs.mkString(", ")
     }
     val opts = {
       val xs = func.args.collect {
         case opt(name, _) ⇒
-          val ccName = nameToCamelCase(name)
-          s""""$name" -> $ccName.ast"""
+          val ccName = "${" + nameToCamelCase(name) + ".json}"
+          s""""$name" : $ccName"""
       }
       xs.mkString(", ")
     }
@@ -80,13 +80,13 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     s"""
        |  $doc
        |  def $funcName($argsDef): $ret = new $ret {
-       |    val ast = Ast.Arr(Seq(
-       |      Ast.Num(${module.termType}),
-       |      Ast.Arr(Seq($args)),
-       |      Ast.Obj(Map($opts))
-       |    ))
+       |    val json = s\"\""[
+       |      ${module.termType},
+       |      [$args],
+       |      {$opts}
+       |    ]\"\""
        |  }
-         """.stripMargin
+     """.stripMargin
   }
 
   private[this] def genOps() = {
@@ -107,7 +107,6 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
            |package reql.dsl
            |
            |import reql.dsl.types._
-           |import pushka.Ast
            |
            |final class $className(val self: $tpeName) extends AnyVal {
            |$funDefs
@@ -131,7 +130,6 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |package reql.dsl
          |
          |import reql.dsl.types._
-         |import pushka.Ast
          |
          |trait OpsImplicits {
          |$defs
@@ -154,7 +152,6 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |package reql.dsl
          |
          |import reql.dsl.types._
-         |import pushka.Ast
          |
          |class BaseOps {
          |$funDefs

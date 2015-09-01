@@ -1,27 +1,26 @@
 package reql.dsl
 
-import pushka.Ast
-
 import scala.language.implicitConversions
 
 trait TypesImplicits {
 
   implicit def toStr(value: String): types.Str = new types.Str {
-    def ast: Ast = Ast.Str(value)
+    val json = s""""$value""""
   }
+
   implicit def toNum(value: Int): types.Num = new types.Num {
-    def ast: Ast = Ast.Num(value)
+    val json = value.toString
   }
 
   implicit def toNum(value: Float): types.Num = new types.Num {
-    def ast: Ast = Ast.Num(value)
+    val json = value.toString
   }
 
   implicit def toNum(value: Double): types.Num = new types.Num {
-    def ast: Ast = Ast.Num(value)
+    val json = value.toString
   }
 
   implicit def toBool(value: Boolean): types.Bool = new types.Bool {
-    def ast: Ast = if (value) Ast.True else Ast.False
+    val json = value.toString
   }
 }

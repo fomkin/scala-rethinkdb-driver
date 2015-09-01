@@ -4,6 +4,16 @@ sealed abstract class ReqlResponseType(val value: Int)
 
 object ReqlResponseType {
 
+  val enum = Seq(
+    SuccessAtom, ClientError, SuccessPartial, 
+    SuccessSequence, CompileError, RuntimeError,
+    WaitComplete
+  )
+
+  def matchType(x: Int) = {
+    enum.find(_.value == x).getOrElse(UnknownError)
+  }
+
   /**
    * Query returned a single RQL datatype. 
    */
