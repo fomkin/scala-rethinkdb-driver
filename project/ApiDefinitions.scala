@@ -86,6 +86,10 @@ object ApiDefinitions {
 
     module(termType = 152, name = "changes")(Top.Sequence.Stream)(
       fun(Top.Sequence.Table)()
+    ),
+
+    module(termType = 103, name = "now")(Top.Datum)(
+      fun()
     )
   )
 }
