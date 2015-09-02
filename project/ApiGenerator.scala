@@ -32,6 +32,10 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     case Top.Sequence.Stream ⇒ "Stream"
     case Top.Sequence.StreamSelection ⇒ "StreamSelection"
     case Top.Sequence.Table ⇒ "Table"
+    // --
+    case Top.PseudoType.Time ⇒ "Time"
+    case Top.PseudoType.Binary ⇒ "Binary"
+
   }
 
   private[this] def genFunc(module: module, func: fun, hasDep: Boolean) = {

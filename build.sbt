@@ -8,7 +8,13 @@ val commonSettings = Seq(
     "-Xfatal-warnings",
     "-language:postfixOps",
     "-language:implicitConversions"
-  )
+  ),
+  publishTo := {
+    isSnapshot.value match {
+      case true => Some("iDecide Snapshots" at "https://nexus.flexis.ru/content/repositories/snapshots")
+      case false => Some("iDecide Releases" at "https://nexus.flexis.ru/content/repositories/releases")
+    }
+  }
 )
 
 val `scala-reql-core` = crossProject.crossType(CrossType.Pure).
@@ -26,3 +32,7 @@ lazy val `scala-reql-akka` = project.
       "com.typesafe.akka" %% "akka-actor" % "2.3.7"
     )
   )
+
+publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+
+publishArtifact := false

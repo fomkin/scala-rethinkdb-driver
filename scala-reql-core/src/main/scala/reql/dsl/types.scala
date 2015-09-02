@@ -39,4 +39,10 @@ object types {
   trait StreamSelection extends Stream
 
   trait Table extends StreamSelection
+
+  // Pseudo types
+
+  trait Time extends Top
+
+  trait Binary extends Top
 }

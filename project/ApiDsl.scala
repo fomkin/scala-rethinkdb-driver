@@ -8,7 +8,8 @@ object Top {
     Top.Ordering, Top.Pathspec, Top.Sequence, Top.Datum.Bool,
     Top.Datum.Field, Top.Datum.Null, Top.Datum.Num, Top.Datum.Obj,
     Top.Datum.SingleSelection, Top.Datum.Str, Top.Sequence.Stream,
-    Top.Sequence.StreamSelection, Top.Sequence.Table
+    Top.Sequence.StreamSelection, Top.Sequence.Table,
+    Top.PseudoType.Time, Top.PseudoType.Binary
   )
 
   sealed trait Datum extends Top
@@ -66,6 +67,13 @@ object Top {
     sealed trait Table extends StreamSelection
 
     case object Table extends Table
+  }
+
+  object PseudoType {
+
+    case object Time extends Top
+
+    case object Binary extends Top
   }
 }
 
