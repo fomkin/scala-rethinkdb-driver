@@ -52,4 +52,35 @@ object types {
   trait CursorResultQuery extends ReqlArg
 
   trait AtomResultQuery extends ReqlArg
+  
+  // Var
+  
+  object Var {
+    def apply(n: Int): Var = new Var {
+      val json = s"[10, [$n]]"
+    }
+  }
+  
+  trait Var extends ReqlArg with Sequence with Database 
+  with Function with Null with Num with Str
+  with Bool with Time with Ordering
+
+  
+  def extractJson(from: ReqlArg): String = from.json
+
+  def extractJson(from: (Var) ⇒ Function): String = {
+    val body = from(Var(1)) 
+    s"[69, [[2, [1]], ${body.json}]]"
+  }
+
+  def extractJson(from: (Var, Var) ⇒ Function): String = {
+    val body = from(Var(1), Var(2))
+    s"[69, [[2, [1, 2]], ${body.json}]]"
+  }
+
+  def extractJson(from: (Var, Var, Var) ⇒ Function): String = {
+    val body = from(Var(1), Var(2), Var(3))
+    s"[69, [[2, [1, 2, 3]], ${body.json}]]"
+  }
+
 }

@@ -3,9 +3,8 @@ object ApiDefinitions {
 
   // fun definitions for
   val groupedFunctions = Seq(
-    fun(Top.Sequence)(arg("fieldName", Top.Datum.Str)) //,
-    //fun(Top.Sequence)(arg("field", Top.Datum.Field)),
-    //fun(Top.Sequence)(arg("f", Top.Function))
+    fun(Top.Sequence)(multiarg("field", Top.Datum.Str)),
+    fun("_f", Top.Sequence)(multiarg("f", Top.FunctionArg(1)))
   )
 
   val modules = Seq(
@@ -79,13 +78,40 @@ object ApiDefinitions {
     ),
 
     // SEQUENCE, STRING -> GROUPED_SEQUENCE | SEQUENCE, FUNCTION -> GROUPED_SEQUENCE
-    module(termType = 144, name = "group")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 145, name = "sum")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 146, name = "avg")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 147, name = "min")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 148, name = "max")(Top.Sequence)(groupedFunctions: _*),
+    module
+      (termType = 144, name = "group")
+      (Top.Function, Top.Sequence)
+      (groupedFunctions.map(
+        fun ⇒ fun.copy(customName = fun.customName.map("group" + _))
+      ): _*),
+    module
+      (termType = 145, name = "sum")
+      (Top.Function, Top.Sequence)
+      (groupedFunctions.map(
+        fun ⇒ fun.copy(customName = fun.customName.map("sum" + _))
+      ): _*),
+    module
+      (termType = 146, name = "avg")
+      (Top.Function, Top.Sequence)
+      (groupedFunctions.map(
+        fun ⇒ fun.copy(customName = fun.customName.map("avg" + _))
+      ): _*),
+    module
+      (termType = 147, name = "min")
+      (Top.Function, Top.Sequence)
+      (groupedFunctions.map(
+        fun ⇒ fun.copy(customName = fun.customName.map("min" + _))
+      ): _*),
+    module
+      (termType = 148, name = "max")
+      (Top.Function, Top.Sequence)
+      (groupedFunctions.map(
+        fun ⇒ fun.copy(customName = fun.customName.map("max" + _))
+      ): _*),
 
-    module(termType = 152, name = "changes")(Top.Sequence.Stream)(fun(Top.Sequence.Table)()),
+    module(termType = 152, name = "changes")
+      (Top.Sequence.Stream)
+      (fun(Top.Sequence.Table)()),
 
     //----------------------------------------------------
     //
