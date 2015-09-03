@@ -12,7 +12,7 @@ import scala.annotation.{switch, tailrec}
  * See specification at
  * http://www.rethinkdb.com/docs/writing-drivers/
  */
-trait ReqlConnection[Json] {
+trait ReqlConnection {
 
   import ReqlConnection._
 
@@ -34,7 +34,10 @@ trait ReqlConnection[Json] {
     token
   }
 
-  def continueQuery(token: Long) = send(token, ContinueBuffer)
+  def continueQuery(token: Long) = {
+    println("Continue query")
+    send(token, ContinueBuffer)
+  }
 
   def stopQuery(token: Long) = send(token, StopBuffer)
 
@@ -44,15 +47,11 @@ trait ReqlConnection[Json] {
   //
   //---------------------------------------------------------------------------
 
-  protected case class Response(t: Int, r: Json)
-
   protected def sendBytes(data: ByteBuffer): Unit
 
   protected def onFatalError(message: String): Unit
 
-  protected def onResponse(queryToken: Long, tpe: ReqlResponseType, data: Json): Unit
-
-  protected def parseResponse(s: String): Response
+  protected def onResponse(token: Long, data: Array[Byte]): Unit
 
   /**
    * Process data from RethinkDB server when connection
@@ -61,6 +60,7 @@ trait ReqlConnection[Json] {
    * @param data Raw data from connection
    */
   protected def processData(data: ByteBuffer): Unit = {
+    println(s"${data.capacity()} bytes received")
     // Update buffer
     buffer.position(0)
     buffer = ByteBuffer.allocate(buffer.capacity + data.capacity).
@@ -81,9 +81,10 @@ trait ReqlConnection[Json] {
           val queryToken = buffer.getLong(0)
           val responseLength = buffer.getInt(8)
           val messageSize = HeaderSize + responseLength
-          //println(s"Header: queryToken=$queryToken, responseLength=$responseLength, messageSize=$messageSize")
+          println(s"responseLength=$responseLength, buffer.capacity=${buffer.capacity}")
           // Enough for body
           if (buffer.capacity >= messageSize) {
+            println("Enough for body")
             val jsonBytes = new Array[Byte](responseLength)
             buffer.position(HeaderSize)
             buffer.get(jsonBytes)
@@ -91,7 +92,7 @@ trait ReqlConnection[Json] {
             buffer.position(messageSize)
             buffer = buffer.slice()
             // Process response
-            processResponse(queryToken, jsonBytes)
+            onResponse(queryToken, jsonBytes)
             processData()
           }
         }
@@ -128,7 +129,7 @@ trait ReqlConnection[Json] {
    */
   protected def createHandshakeBuffer(authKey: Option[String],
                                       version: ReqlVersion = ReqlVersion.V04,
-                                      protocol: ReqlProtocol = ReqlProtocol.JSON): ByteBuffer = {
+                                      protocol: ReqlProtocol = ReqlProtocol.Json): ByteBuffer = {
     val authKeyBuffer = authKey.fold(ByteBuffer.allocate(4)) { key ⇒
       val buffer = ByteBuffer.allocate(key.length + 4).
         order(ByteOrder.LITTLE_ENDIAN).
@@ -168,19 +169,6 @@ trait ReqlConnection[Json] {
       put(data)
     buffer.position(0)
     sendBytes(buffer)
-  }
-
-  private[this] def processResponse(token: Long, data: Array[Byte]): Unit = {
-    val response = parseResponse(new String(data, StandardCharsets.UTF_8))
-    val t = ReqlResponseType.matchType(response.t)
-    if (t == ReqlResponseType.SuccessPartial) {
-      continueQuery(token)
-    }
-    onResponse(
-      queryToken = token,
-      tpe = t,
-      data = response.r
-    )
   }
 }
 

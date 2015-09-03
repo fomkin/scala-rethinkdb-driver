@@ -6,10 +6,9 @@ object Top {
   val all = Seq(
     Top.Arr, Top.Database, Top.Datum, Top.Error, Top.Function,
     Top.Ordering, Top.Pathspec, Top.Sequence, Top.Datum.Bool,
-    Top.Datum.Field, Top.Datum.Null, Top.Datum.Num, Top.Datum.Obj,
-    Top.Datum.SingleSelection, Top.Datum.Str, Top.Sequence.Stream,
-    Top.Sequence.StreamSelection, Top.Sequence.Table,
-    Top.PseudoType.Time, Top.PseudoType.Binary
+    Top.Datum.Null, Top.Datum.Num, Top.Datum.Obj, Top.Datum.SingleSelection,
+    Top.Datum.Str, Top.Sequence.Stream, Top.Sequence.StreamSelection,
+    Top.Sequence.Table, Top.PseudoType.Time, Top.PseudoType.Binary
   )
 
   sealed trait Datum extends Top
@@ -39,9 +38,6 @@ object Top {
     sealed trait Str extends Datum
 
     case object Str extends Str
-
-    // Non-standard
-    case object Field extends Str
 
     sealed trait Obj
 

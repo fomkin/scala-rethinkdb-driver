@@ -2,7 +2,7 @@ package reql.dsl
 
 import scala.language.implicitConversions
 
-trait TypesImplicits {
+trait ReqlTypesConversions {
 
   implicit def toStr(value: String): types.Str = new types.Str {
     val json = s""""$value""""

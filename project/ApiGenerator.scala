@@ -22,7 +22,6 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     case Top.Sequence ⇒ "Sequence"
     // --
     case Top.Datum.Bool ⇒ "Bool"
-    case Top.Datum.Field ⇒ "Field"
     case Top.Datum.Null ⇒ "Null"
     case Top.Datum.Num ⇒ "Num"
     case Top.Datum.Obj ⇒ "Obj"
@@ -125,17 +124,17 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       val xs = Top.all map { tpe ⇒
         val name = topToName(tpe)
         val nameOps = name + "Ops"
-        s"  implicit def To$nameOps(x: $name): $nameOps = new $nameOps(x)"
+        s"  implicit def to$nameOps(x: $name): $nameOps = new $nameOps(x)"
       }
       xs.mkString("\n")
     }
-    ReqlFile("OpsImplicits.scala",
+    ReqlFile("ReqlTermOpsConversions.scala",
       s"""
          |package reql.dsl
          |
          |import reql.dsl.types._
          |
-         |trait OpsImplicits {
+         |trait ReqlTermOpsConversions {
          |$defs
          |}
      """.stripMargin
@@ -151,13 +150,13 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       }
       xs.mkString("\n")
     }
-    ReqlFile("BaseOps.scala",
+    ReqlFile("ReqlTopLevelApi.scala",
       s"""
          |package reql.dsl
          |
          |import reql.dsl.types._
          |
-         |class BaseOps {
+         |class ReqlTopLevelApi {
          |$funDefs
          |}
      """.stripMargin

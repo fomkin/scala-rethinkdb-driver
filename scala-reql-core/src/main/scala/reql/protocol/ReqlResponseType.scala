@@ -2,6 +2,8 @@ package reql.protocol
 
 sealed abstract class ReqlResponseType(val value: Int)
 
+sealed trait ReqlResponseWithError
+
 object ReqlResponseType {
 
   val enum = Seq(
@@ -45,14 +47,14 @@ object ReqlResponseType {
    * client sends a malformed protobuf, or tries to
    * send [CONTINUE] for an unknown token.
    */
-  case object ClientError extends ReqlResponseType(16)
+  case object ClientError extends ReqlResponseType(16) with ReqlResponseWithError
 
   /**
    * Means the query failed during parsing or type
    * checking.  For example, if you pass too many
    * arguments to a function.
    */
-  case object CompileError extends ReqlResponseType(17)
+  case object CompileError extends ReqlResponseType(17) with ReqlResponseWithError
 
   /**
    * Means the query failed at runtime.  An example is
@@ -60,7 +62,7 @@ object ReqlResponseType {
    * they turn out at runtime to be booleans rather
    * than numbers.
    */
-  case object RuntimeError extends ReqlResponseType(18)
+  case object RuntimeError extends ReqlResponseType(18) with ReqlResponseWithError
 
-  case object UnknownError extends ReqlResponseType(-1)
+  case object UnknownError extends ReqlResponseType(-1) with ReqlResponseWithError
 }
