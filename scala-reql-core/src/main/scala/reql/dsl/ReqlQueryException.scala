@@ -13,7 +13,7 @@ object ReqlQueryException {
     extends ReqlQueryException
 
   /**
-   * End of stream
+   * End of cursor
    */
   case object End extends ReqlQueryException
 } 

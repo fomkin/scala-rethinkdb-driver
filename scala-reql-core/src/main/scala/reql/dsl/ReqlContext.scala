@@ -10,7 +10,7 @@ import scala.language.implicitConversions
  * hi-level RethinkDB access. 
  * @tparam Data JSON AST base trait or primitive
  */
-trait ReqlContext[Data] {
+trait ReqlContext[Data] extends ReqlEntryPoint {
 
   import ReqlContext._
 
