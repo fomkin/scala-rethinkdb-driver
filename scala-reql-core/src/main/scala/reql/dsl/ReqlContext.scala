@@ -69,7 +69,7 @@ trait ReqlContext[Data] {
 
 object ReqlContext {
 
-  type AtomCb[Data] = Data ⇒ _
+  type AtomCb[Data] = Either[ReqlQueryException, Data] ⇒ _
 
   type CursorCb[Data] = Cursor[Data] ⇒ _
 
@@ -80,7 +80,7 @@ object ReqlContext {
   }
 
   final class AtomResultQueryOps[Data](val self: AtomResultQuery) extends AnyVal {
-    def run[U](f: Data ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
+    def run[U](f: Either[ReqlQueryException, Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
       c.runAtomQuery(self, f)
     }
   }

@@ -3,7 +3,7 @@ package reql.akka
 import akka.actor.{Actor, ActorRef}
 import akka.pattern.ask
 import akka.util.Timeout
-import reql.dsl.{Cursor, ReqlArg, ReqlContext}
+import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -65,32 +65,35 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
     case object Idle extends CursorState
 
-    case class AwaitNext(f: Option[Data] ⇒ _) extends CursorState
+    case class Next(f: Either[ReqlQueryException, Data] ⇒ _) extends CursorState
 
-    case class AwaitFinish(f: Seq[Data] ⇒ _) extends CursorState
+    case class Force(f: Either[ReqlQueryException, Seq[Data]] ⇒ _) extends CursorState
 
-    case class Foreach(f: Option[Data] ⇒ _) extends CursorState
+    case class Foreach(f: Either[ReqlQueryException, Data] ⇒ _) extends CursorState
 
+    case class Failed(e: ReqlQueryException.ReqlErrorResponse) extends CursorState
+    
     var state: CursorState = Idle
 
     var data = List.empty[Data]
 
     var closed = false
 
-    def next[U](f: (Option[Data]) => U): Unit = {
-      checkIsIdle()
-      if (closed) {
-        f(None)
-      }
-      else {
-        data match {
-          case x :: xs ⇒
-            data = xs
-            f(Some(x))
-          case Nil ⇒
-            state = AwaitNext(f)
+    def next[U](f: Either[ReqlQueryException, Data] ⇒ U): Unit = {
+      checkFail(whenFail = e ⇒ f(Left(e))) {
+        if (closed) {
+          f(Left(ReqlQueryException.End))
         }
-        dbConnection ! ContinueQuery(token)
+        else {
+          data match {
+            case x :: xs ⇒
+              data = xs
+              f(Right(x))
+            case Nil ⇒
+              state = Next(f)
+          }
+          dbConnection ! ContinueQuery(token)
+        }
       }
     }
 
@@ -99,24 +102,42 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
       else throw CursorException("Cursor already closed")
     }
 
-    def force[U](f: Seq[Data] ⇒ U): Unit = {
-      checkIsIdle()
-      if (closed) f(data.reverse)
-      else state = AwaitFinish(f)
+    def force[U](f: Either[ReqlQueryException, Seq[Data]] ⇒ U): Unit = {
+      checkFail(whenFail = e ⇒ f(Left(e))) {
+        if (closed) f(Right(data.reverse))
+        else state = Force(f)
+      }  
     }
 
-    def foreach[U](f: Option[Data] ⇒ U): Unit = {
-      checkIsIdle()
-      data.foreach(x ⇒ f(Some(x)))
-      data = Nil
-      state = Foreach(f)
-      dbConnection ! ContinueQuery(token)
+    def foreach[U](f: Either[ReqlQueryException, Data] ⇒ U): Unit = {
+      checkFail(whenFail = e ⇒ f(Left(e))) {
+        data.foreach(x ⇒ f(Right(x)))
+        data = Nil
+        state = Foreach(f)
+        dbConnection ! ContinueQuery(token)
+      }  
     }
 
-    def checkIsIdle(): Unit = {
-      if (state != Idle) {
-        throw CursorException(s"Cursor already activated: $state")
+    /**
+     * Check cursor is idle and not failed 
+     */
+    def checkFail[U1, U2](whenFail: ReqlQueryException ⇒ U1)(whenNot: ⇒ U2): Unit = {
+      state match {
+        case Failed(e) ⇒ whenFail(e)
+        case Idle ⇒ whenNot
+        case _ ⇒
+          val msg = s"Cursor already activated: $state"
+          val e = ReqlQueryException.ReqlIllegalUsage(msg)
+          whenFail(e)
       }
+    }
+
+    def fail(exception: ReqlQueryException.ReqlErrorResponse): Unit = state match {
+      case Idle ⇒ state = Failed(exception)
+      case Foreach(f) ⇒ f(Left(exception))
+      case Next(f) ⇒ f(Left(exception))
+      case Force(f) ⇒ f(Left(exception))
+      case Failed(_) ⇒ // We cant fail twice!
     }
 
     def append(value: Data, close: Boolean): Unit = {
@@ -124,9 +145,9 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
       if (close) closed = true
       // Apply
       state match {
-        case AwaitNext(f) ⇒ f(Some(value))
+        case Next(f) ⇒ f(Right(value))
         case Foreach(f) ⇒
-          f(Some(value))
+          f(Right(value))
           if (!close) {
             dbConnection ! ContinueQuery(token)
           }
@@ -135,9 +156,9 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
       // After apply
       if (close) {
         state match {
-          case AwaitNext(f) ⇒ f(None)
-          case Foreach(f) ⇒ f(None)
-          case AwaitFinish(f) ⇒ f(data.reverse)
+          case Next(f) ⇒ f(Left(ReqlQueryException.End))
+          case Foreach(f) ⇒ f(Left(ReqlQueryException.End))
+          case Force(f) ⇒ f(Right(data.reverse))
           case _ ⇒ // Do nothing
         }
       }
@@ -168,19 +189,15 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   override def unhandled(message: Any): Unit = {
     message match {
       case ReqlTcpConnection.Response(token, rawData) ⇒
-        println("Reponse received")
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom ⇒
-            println(pr)
-            atomCallbacks.remove(token).foreach(cb ⇒ cb(pr.data))
+            atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Sequence if pr.partial ⇒
-            println(pr)
             val cursor = activeCursors.getOrElseUpdate(
               token, registerCursorForPartialResponse(token))
             pr.xs.foreach(cursor.append(_, close = false))
           case pr: ParsedResponse.Sequence if !pr.partial ⇒
-            println(pr)
             activeCursors.get(token) match {
               case Some(cursor) ⇒ appendSequenceToCursor(cursor, pr.xs.toList)
               case None ⇒ cursorCallbacks.get(token) foreach { cb ⇒
@@ -191,8 +208,23 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
             }
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Error ⇒
-            println(pr)
-            // TODO
+            val ex = ReqlQueryException.ReqlErrorResponse(pr.tpe, pr.text)
+            dbConnection ! ForgetQuery(token)
+            activeCursors.get(token) match {
+              case Some(cursor) ⇒
+                cursor.fail(ex)
+              case None ⇒
+                cursorCallbacks.get(token) match {
+                  case Some(cb) ⇒
+                    val cursor = new CursorImpl(token)
+                    cursor.fail(ex)
+                    cb(cursor)
+                  case None ⇒
+                    atomCallbacks.get(token) foreach { cb ⇒
+                      cb(Left(ex))
+                    } 
+                }
+            } 
         }
       case RegisterCursorCb(token, f) ⇒ 
         cursorCallbacks(token) = f
