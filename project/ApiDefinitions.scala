@@ -1,12 +1,12 @@
 // https://raw.githubusercontent.com/rethinkdb/rethinkdb/v2.1.1/src/rdb_protocol/ql2.proto
 object ApiDefinitions {
 
-  // fun definitions for
-  val groupedFunctions = Seq(
-    fun(Top.Sequence)(arg("fieldName", Top.Datum.Str)) //,
-    //fun(Top.Sequence)(arg("field", Top.Datum.Field)),
-    //fun(Top.Sequence)(arg("f", Top.Function))
-  )
+  def genGroupModule(termType: Int, name: String) = {
+    module(termType = termType, name = name)(Top.Function, Top.Datum.Obj)(
+      fun(Top.Sequence)(multiarg("field", Top.Datum.Str)),
+      fun(name + "_f", Top.Sequence)(multiarg("f", Top.FunctionArg(1)))
+    )
+  }
 
   val modules = Seq(
     // * Data Operators
@@ -21,8 +21,8 @@ object ApiDefinitions {
         |}}}
       """.stripMargin
     )(Top.Database)(
-      fun(arg("name", Top.Datum.Str))
-    ),
+        fun(arg("name", Top.Datum.Str))
+      ),
 
     // TABLE = 15;
     // Database, STRING, {read_mode:STRING, identifier_format:STRING} -> Table
@@ -36,19 +36,19 @@ object ApiDefinitions {
         |}}}
       """.stripMargin
     )(Top.Sequence.Table)(
-      fun(Top.Database)(
-        arg("name", Top.Datum.Str),
-        opt("read_mode", Top.Datum.Str),
-        opt("identifier_format", Top.Datum.Str)
+        fun(Top.Database)(
+          arg("name", Top.Datum.Str),
+          opt("read_mode", Top.Datum.Str),
+          opt("identifier_format", Top.Datum.Str)
+        ),
+        fun(Top.Database)(
+          arg("name", Top.Datum.Str)
+        ),
+        fun(Top.Database)(
+          arg("name", Top.Datum.Str),
+          opt("read_mode", Top.Datum.Str)
+        )
       ),
-      fun(Top.Database)(
-        arg("name", Top.Datum.Str)
-      ),
-      fun(Top.Database)(
-        arg("name", Top.Datum.Str),
-        opt("read_mode", Top.Datum.Str)
-      )
-    ),
 
     // Gets a single element from a table by its primary or a secondary key.
     // Table, STRING -> SingleSelection | Table, NUMBER -> SingleSelection |
@@ -57,6 +57,29 @@ object ApiDefinitions {
       fun(Top.Sequence.Table)(arg("key", Top.Datum.Str)),
       fun(Top.Sequence.Table)(arg("key", Top.Datum.Num))
     ),
+
+
+    // GET_FIELD  = 31; // OBJECT, STRING -> DATUM
+    // | Sequence, STRING -> Sequence
+    module(termType = 31, name = "getField")(Top.AnyType)(
+      fun(Top.Datum.Obj)(arg("field_name", Top.Datum.Str))
+    ),
+
+    module(termType = 38, name = "map", doc =
+      """
+        |Transform each element of one or more sequences by applying a mapping function to them. If map is run with two or more sequences, it will iterate for as many items as there are in the shortest sequence.
+        |Example: Return the first five squares.
+        |{{{
+        |r.expr([1, 2, 3, 4, 5]).map(function (val) {
+        |    return val.mul(val);
+        |}).run(conn, callback);
+        |}}}
+        |// Result passed to callback
+        |[1, 4, 9, 16, 25]
+      """.stripMargin
+    )(Top.Sequence)(
+        fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+      ),
 
     // Table, OBJECT, {conflict:STRING, durability:STRING, return_changes:BOOL} -> OBJECT |
     // Table, Sequence, {conflict:STRING, durability:STRING, return_changes:BOOL} -> OBJECT
@@ -74,18 +97,20 @@ object ApiDefinitions {
         |}}}
       """.stripMargin
     )(Top.Datum.Obj)(
-      fun(Top.Sequence.Table)(arg("data", Top.Datum.Obj)),
-      fun(Top.Sequence.Table)(arg("data", Top.Sequence))
-    ),
+        fun(Top.Sequence.Table)(arg("data", Top.Datum.Obj)),
+        fun(Top.Sequence.Table)(arg("data", Top.Sequence))
+      ),
 
     // SEQUENCE, STRING -> GROUPED_SEQUENCE | SEQUENCE, FUNCTION -> GROUPED_SEQUENCE
-    module(termType = 144, name = "group")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 145, name = "sum")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 146, name = "avg")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 147, name = "min")(Top.Sequence)(groupedFunctions: _*),
-    module(termType = 148, name = "max")(Top.Sequence)(groupedFunctions: _*),
+    genGroupModule(144, "group"),
+    genGroupModule(145, "sum"),
+    genGroupModule(146, "avg"),
+    genGroupModule(147, "min"),
+    genGroupModule(148, "max"),
 
-    module(termType = 152, name = "changes")(Top.Sequence.Stream)(fun(Top.Sequence.Table)()),
+    module(termType = 152, name = "changes")
+      (Top.Sequence.Stream)
+      (fun(Top.Sequence.Table)()),
 
     //----------------------------------------------------
     //
@@ -98,32 +123,32 @@ object ApiDefinitions {
       """
         |Puts a time into an ISO 8601 timezone.
       """.stripMargin)(Top.Datum)(
-      fun(Top.PseudoType.Time)(arg("timezone", Top.Datum.Str))
-    ),
+        fun(Top.PseudoType.Time)(arg("timezone", Top.Datum.Str))
+      ),
     module(termType = 105, name = "during", doc =
       """
         |a.during(b, c) returns whether a is in the range [b, c]
       """.stripMargin)(Top.Datum.Bool)(
-      fun(Top.PseudoType.Time)(arg("left", Top.PseudoType.Time), arg("right", Top.PseudoType.Time))
-    ),
+        fun(Top.PseudoType.Time)(arg("left", Top.PseudoType.Time), arg("right", Top.PseudoType.Time))
+      ),
     module(termType = 106, name = "date", doc =
       """
         |Retrieves the date portion of a time.
       """.stripMargin)(Top.PseudoType.Time)(
-      fun(Top.PseudoType.Time)()
-    ),
+        fun(Top.PseudoType.Time)()
+      ),
     module(termType = 126, name = "timeOfDay", doc =
       """
         |x.time_of_day == x.date - x
       """.stripMargin)(Top.Datum.Num)(
-      fun(Top.PseudoType.Time)()
-    ),
+        fun(Top.PseudoType.Time)()
+      ),
     module(termType = 127, name = "timezone", doc =
       """
         |Returns the timezone of a time.
       """.stripMargin)(Top.Datum.Str)(
-      fun(Top.PseudoType.Time)()
-    ),
+        fun(Top.PseudoType.Time)()
+      ),
 
     module(termType = 128, name = "year")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 129, name = "month")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
@@ -158,22 +183,22 @@ object ApiDefinitions {
         |    .run(conn, callback)
         |}}}
       """.stripMargin)(Top.PseudoType.Time)(
-      fun(
-        arg("year", Top.Datum.Num),
-        arg("month", Top.Datum.Num),
-        arg("day", Top.Datum.Num),
-        arg("timezone", Top.Datum.Str)
-      ),
-      fun(
-        arg("year", Top.Datum.Num),
-        arg("month", Top.Datum.Num),
-        arg("day", Top.Datum.Num),
-        arg("hour", Top.Datum.Num),
-        arg("minutes", Top.Datum.Num),
-        arg("seconds", Top.Datum.Num),
-        arg("timezone", Top.Datum.Str)
+        fun(
+          arg("year", Top.Datum.Num),
+          arg("month", Top.Datum.Num),
+          arg("day", Top.Datum.Num),
+          arg("timezone", Top.Datum.Str)
+        ),
+        fun(
+          arg("year", Top.Datum.Num),
+          arg("month", Top.Datum.Num),
+          arg("day", Top.Datum.Num),
+          arg("hour", Top.Datum.Num),
+          arg("minutes", Top.Datum.Num),
+          arg("seconds", Top.Datum.Num),
+          arg("timezone", Top.Datum.Str)
+        )
       )
-    )
 
     /*
         IMPLEMENT ME

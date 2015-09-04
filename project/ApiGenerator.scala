@@ -12,11 +12,14 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
   }
 
   private[this] def topToName(t: Top): String = t match {
+    case Top.FunctionArg(n) ⇒
+      val args = (0 until n).map(_ ⇒ "Var").mkString(",")
+      s"($args) => Function"
+    case Top.Function ⇒ "Function"
     case Top.Arr ⇒ "Arr"
     case Top.Database ⇒ "Database"
     case Top.Datum ⇒ "Datum"
     case Top.Error ⇒ "Error"
-    case Top.Function ⇒ "Function"
     case Top.Ordering ⇒ "Ordering"
     case Top.Pathspec ⇒ "Pathspec"
     case Top.Sequence ⇒ "Sequence"
@@ -34,7 +37,8 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     // --
     case Top.PseudoType.Time ⇒ "Time"
     case Top.PseudoType.Binary ⇒ "Binary"
-
+    // --
+    case Top.AnyType ⇒ "AnyType"
   }
 
   private[this] def genFunc(module: module, func: fun, hasDep: Boolean) = {
@@ -44,7 +48,13 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       val xs = func.args.map { arg ⇒
         val name = nameToCamelCase(arg.name)
         val tpe = topToName(arg.tpe)
-        s"$name: $tpe"
+        if (arg.isMulti) {
+          arg.tpe match {
+            case _: Top.FunctionArg ⇒ s"$name: ($tpe)*"
+            case _ ⇒ s"$name: $tpe*"
+          }
+        }
+        else s"$name: $tpe"
       }
       xs.mkString(", ")
     }
@@ -53,18 +63,21 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       val xs = func.args.collect {
         case arg(name, _) ⇒
           val ccName = nameToCamelCase(name)
-          "${" + ccName + ".json}"
+          "${extractJson(" + ccName + ")}"
+        case multiarg(name, _) ⇒
+          val ccName = nameToCamelCase(name)
+          "${" + ccName + ".map(extractJson).mkString(\", \")}"
       }
       if (hasDep) {
-        if (xs.isEmpty) "${self.json}"
-        else "${self.json}, " + xs.mkString(", ")
+        if (xs.isEmpty) "${extractJson(self)}"
+        else "${extractJson(self)}, " + xs.mkString(", ")
       }
       else xs.mkString(", ")
     }
     val opts = {
       val xs = func.args.collect {
         case opt(name, _) ⇒
-          val ccName = "${" + nameToCamelCase(name) + ".json}"
+          val ccName = "${extractJson(" + nameToCamelCase(name) + ")}"
           s""""$name" : $ccName"""
       }
       xs.mkString(", ")
@@ -80,14 +93,27 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
        """.stripMargin
     }
     val ret = module.dataTypes.map(topToName).mkString(" with ")
+//    val varFunDef = if (func.args.nonEmpty) {
+//      val varArgsDef = {
+//        val xs = func.args map { arg ⇒
+//          val name = nameToCamelCase(arg.name)
+//          if (arg.isMulti) s"$name: Var*"
+//          else s"$name: Var"
+//        }
+//        xs.mkString(", ")
+//      }
+//      s"""
+//         |  def $funcName($varArgsDef): $ret = new $ret {
+//         |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
+//         |  }
+//       """
+//    } else {
+//      ""
+//    }
     s"""
-       |  $doc
+       |$doc
        |  def $funcName($argsDef): $ret = new $ret {
-       |    val json = s\"\""[
-       |      ${module.termType},
-       |      [$args],
-       |      {$opts}
-       |    ]\"\""
+       |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
        |  }
      """.stripMargin
   }
