@@ -5,11 +5,15 @@ package reql.dsl
  */
 object types {
 
+  trait AnyType extends ReqlArg with Sequence with Database
+  with Function with Obj with Null with Num with Str
+  with Bool with Time with Ordering with Pathspec
+
   trait Top extends ReqlArg
 
-  trait Datum extends Top
+  trait Datum extends Top with Function
 
-  trait Sequence extends Top with CursorResultQuery
+  trait Sequence extends Top with CursorResultQuery with Function
 
   trait Arr extends Datum with Sequence
 
@@ -23,7 +27,7 @@ object types {
 
   trait Error extends Top
 
-  trait Null extends Datum  with AtomResultQuery
+  trait Null extends Datum with AtomResultQuery
 
   trait Bool extends Datum with AtomResultQuery
 
@@ -61,10 +65,7 @@ object types {
     }
   }
   
-  trait Var extends ReqlArg with Sequence with Database 
-  with Function with Null with Num with Str
-  with Bool with Time with Ordering
-
+  trait Var extends AnyType
   
   def extractJson(from: ReqlArg): String = from.json
 

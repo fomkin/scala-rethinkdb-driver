@@ -111,10 +111,16 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
     def foreach[U](f: Either[ReqlQueryException, Data] ⇒ U): Unit = {
       checkFail(whenFail = e ⇒ f(Left(e))) {
-        data.foreach(x ⇒ f(Right(x)))
-        data = Nil
-        state = Foreach(f)
-        dbConnection ! ContinueQuery(token)
+        if (data == Nil) {
+          f(Left(ReqlQueryException.End))
+        } else {
+          data.foreach(x ⇒ f(Right(x)))
+          data = Nil
+        }
+        if (!closed) {
+          state = Foreach(f)
+          dbConnection ! ContinueQuery(token)
+        }
       }  
     }
 
@@ -172,12 +178,12 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   private[this] val activeCursors = mutable.Map.empty[Long, CursorImpl]
 
   @tailrec
-  private[this] def appendSequenceToCursor(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
+  private[this] def appendSequenceToCursorAndClose(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
     case Nil ⇒ // Do nothing
     case x :: Nil ⇒ cursor.append(x, close = true)
     case x :: xs ⇒
       cursor.append(x, close = false)
-      appendSequenceToCursor(cursor, xs)
+      appendSequenceToCursorAndClose(cursor, xs)
   }
 
   private[this] def registerCursorForPartialResponse(token: Long): CursorImpl = {
@@ -189,25 +195,30 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   override def unhandled(message: Any): Unit = {
     message match {
       case ReqlTcpConnection.Response(token, rawData) ⇒
+        println("Response")
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom ⇒
+            println(pr)
             atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Sequence if pr.partial ⇒
+            println(pr)
             val cursor = activeCursors.getOrElseUpdate(
               token, registerCursorForPartialResponse(token))
             pr.xs.foreach(cursor.append(_, close = false))
           case pr: ParsedResponse.Sequence if !pr.partial ⇒
+            println(pr)
             activeCursors.get(token) match {
-              case Some(cursor) ⇒ appendSequenceToCursor(cursor, pr.xs.toList)
+              case Some(cursor) ⇒ appendSequenceToCursorAndClose(cursor, pr.xs.toList)
               case None ⇒ cursorCallbacks.get(token) foreach { cb ⇒
                 val cursor = new CursorImpl(token)
-                appendSequenceToCursor(cursor, pr.xs.toList)
+                appendSequenceToCursorAndClose(cursor, pr.xs.toList)
                 cb(cursor)
               }
             }
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Error ⇒
+            println(pr)
             val ex = ReqlQueryException.ReqlErrorResponse(pr.tpe, pr.text)
             dbConnection ! ForgetQuery(token)
             activeCursors.get(token) match {

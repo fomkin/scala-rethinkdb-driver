@@ -11,6 +11,8 @@ object Top {
     Top.Sequence.Table, Top.PseudoType.Time, Top.PseudoType.Binary
   )
 
+  case object AnyType extends Top
+  
   sealed trait Datum extends Top
 
   sealed trait Sequence extends Top
