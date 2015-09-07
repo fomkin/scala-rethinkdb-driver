@@ -1,6 +1,6 @@
 package reql.dsl
 
-import reql.dsl.types.{Arr, Obj}
+import reql.dsl.types.{Arr, Obj, Datum}
 
 import scala.language.{dynamics, implicitConversions}
 
@@ -15,7 +15,11 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
    * The top-level ReQL namespace. Alias to [[rethinkdb]]
    */
   val r = rethinkdb
-
+    
+  val Null = new Datum {
+    val json = "null"
+  }  
+  
   /**
    * Use it to create RethinkDB objects.
    *
@@ -29,6 +33,11 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
    * )
    */
   val document = new Dynamic {
+    
+    val empty = new Obj {
+      val json = s"[3, [], {}]"
+    }
+    
     def applyDynamicNamed(method: String)(args: (String, ReqlArg)*): Obj = new Obj {
       val json = {
         val optArgs = {

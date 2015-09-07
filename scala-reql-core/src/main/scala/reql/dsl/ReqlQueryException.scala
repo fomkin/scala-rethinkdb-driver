@@ -17,3 +17,5 @@ object ReqlQueryException {
    */
   case object End extends ReqlQueryException
 } 
+
+case class ThrowableReqlQueryException(value: ReqlQueryException) extends Throwable

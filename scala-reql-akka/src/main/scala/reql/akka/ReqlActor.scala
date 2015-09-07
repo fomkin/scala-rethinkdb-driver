@@ -33,7 +33,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   //
   //---------------------------------------------------------------------------
 
-  def runCursorQuery[U](query: ReqlArg, f: CursorCb[Data]): Unit = {
+  def runCursorQuery[U](query: ReqlArg)(f: CursorCb[Data]): Unit = {
     import context.dispatcher
     val message = StartQuery(query, Some(self))
     dbConnection.ask(message)(queryTimeout).mapTo[Long] foreach { token ⇒
@@ -41,7 +41,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     }
   }
 
-  def runAtomQuery[U](query: ReqlArg, f: AtomCb[Data]): Unit = {
+  def runAtomQuery[U](query: ReqlArg)(f: AtomCb[Data]): Unit = {
     import context.dispatcher
     val message = StartQuery(query, Some(self))
     dbConnection.ask(message)(queryTimeout).mapTo[Long] foreach { token ⇒

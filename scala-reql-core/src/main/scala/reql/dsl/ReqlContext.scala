@@ -3,6 +3,7 @@ package reql.dsl
 import reql.dsl.types.{AtomResultQuery, CursorResultQuery}
 import reql.protocol.ReqlResponseWithError
 
+import scala.concurrent.{Promise, Future}
 import scala.language.implicitConversions
 
 /**
@@ -47,9 +48,9 @@ trait ReqlContext[Data] extends ReqlEntryPoint {
    */
   def parseResponse(data: Array[Byte]): ParsedResponse
 
-  def runCursorQuery[U](query: ReqlArg, f: CursorCb[Data]): Unit
+  def runCursorQuery[U](query: ReqlArg)(f: CursorCb[Data]): Unit
 
-  def runAtomQuery[U](query: ReqlArg, f: AtomCb[Data]): Unit
+  def runAtomQuery[U](query: ReqlArg)(f: AtomCb[Data]): Unit
 
   //---------------------------------------------------------------------------
   //
@@ -74,14 +75,24 @@ object ReqlContext {
   type CursorCb[Data] = Cursor[Data] ⇒ _
 
   final class CursorResultQueryOps[Data](val self: CursorResultQuery) extends AnyVal {
-    def run[U](f: Cursor[Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
-      c.runCursorQuery(self, f)
+    def runC[U](f: Cursor[Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
+      c.runCursorQuery(self)(f)
     }
   }
 
   final class AtomResultQueryOps[Data](val self: AtomResultQuery) extends AnyVal {
-    def run[U](f: Either[ReqlQueryException, Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
-      c.runAtomQuery(self, f)
+    def runA[U](f: Either[ReqlQueryException, Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
+      c.runAtomQuery(self)(f)
+    }
+    def runA(implicit c: ReqlContext[Data]): Future[Data] = {
+      val p = Promise[Data]()
+      c.runAtomQuery[Unit](self) { res: Either[ReqlQueryException, Data]  ⇒
+        res match {
+          case Right(value) ⇒ p.success(value)
+          case Left(value) ⇒ p.failure(ThrowableReqlQueryException(value))
+        }
+      }
+      p.future
     }
   }
 

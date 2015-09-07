@@ -15,6 +15,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     case Top.FunctionArg(n) ⇒
       val args = (0 until n).map(_ ⇒ "Var").mkString(",")
       s"($args) => Function"
+    case Top ⇒ "Top"
     case Top.Function ⇒ "Function"
     case Top.Arr ⇒ "Arr"
     case Top.Database ⇒ "Database"

@@ -9,6 +9,99 @@ object ApiDefinitions {
   }
 
   val modules = Seq(
+  
+    module(termType = 169, name = "uuid")(Top.Datum)(fun()),
+    module(termType = 13, name = "implicitVar")(Top.Datum)(fun()),
+    // TODO hadcode it
+    module(termType = 154, name = "http")(Top.Datum.Obj, Top.Datum.Str)(
+      fun(arg("url", Top.Datum.Str))
+    ),
+
+      // Takes an HTTP URL and gets it.  If the get succeeds and
+      //  returns valid JSON, it is converted into a DATUM
+      // HTTP = 153; // STRING {data: OBJECT | STRING,
+      //         timeout: !NUMBER,
+      //         method: STRING,
+      //         params: OBJECT,
+      //         header: OBJECT | ARRAY,
+      //         attempts: NUMBER,
+      //         redirects: NUMBER,
+      //         verify: BOOL,
+      //         page: FUNC | STRING,
+      //         page_limit: NUMBER,
+      //         auth: OBJECT,
+      //         result_format: STRING,
+      //         } -> STRING | STREAM
+      
+    //-------------------------------------------------------------------------
+    //
+    //  Math
+    //
+    //-------------------------------------------------------------------------
+
+    // EQ  = 17; // DATUM... -> BOOL
+    module(termType = 17, name = "eq")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+      fun(Top.Datum)(arg("and", Top.Datum)),
+      fun("===", Top.Datum)(arg("and", Top.Datum))
+    ),
+    // NE  = 18; // DATUM... -> BOOL
+    module(termType = 18, name = "ne")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+      fun(Top.Datum)(arg("and", Top.Datum)),
+      fun("!===", Top.Datum)(arg("and", Top.Datum))
+    ),
+
+    //LT  = 19; // DATUM... -> BOOL
+    module(termType = 19, name = "lt")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+      fun(Top.Datum)(arg("thn", Top.Datum)),
+      fun("<", Top.Datum)(arg("thn", Top.Datum))
+    ),
+
+    //GT  = 21; // DATUM... -> BOOL
+    module(termType = 21, name = "gt")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+      fun(Top.Datum)(arg("thn", Top.Datum)),
+      fun(">", Top.Datum)(arg("thn", Top.Datum))
+    ),
+
+    // Executes its first argument, and returns its second argument if it
+    // got [true] or its third argument if it got [false] (like an `if`
+    // statement).
+    //BRANCH  = 65; // BOOL, Top, Top -> Top
+    module(termType = 65, name = "branch")(Top.AnyType)(
+      fun(arg("condition", Top.Datum.Bool), arg("thn", Top), arg("els", Top))
+    ),
+
+    //OR = 66; // BOOL... -> BOOL
+    module(termType = 66, name = "or")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum.Bool), arg("b", Top.Datum.Bool)),
+      fun(Top.Datum.Bool)(arg("b", Top.Datum.Bool)),
+      fun("||", Top.Datum)(arg("b", Top.Datum))
+    ),
+
+    //  AND     = 67; // BOOL... -> BOOL
+    module(termType = 67, name = "and")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum.Bool), arg("b", Top.Datum.Bool)),
+      fun(Top.Datum.Bool)(arg("b", Top.Datum.Bool)),
+      fun("&&", Top.Datum)(arg("b", Top.Datum))
+    ),
+
+    // SUB = 25; // NUMBER... -> NUMBER
+    module(termType = 24, name = "add")(Top.Datum.Num)(
+      fun(multiarg("values", Top.Datum.Num)),
+      fun(Top.Datum.Num)(arg("value", Top.Datum.Num)),
+      fun("+", Top.Datum.Num)(arg("value", Top.Datum.Num))
+    ),
+
+    // SUB = 25; // NUMBER... -> NUMBER
+    module(termType = 25, name = "sub")(Top.Datum.Num)(
+      fun(multiarg("values", Top.Datum.Num)),
+      fun(Top.Datum.Num)(arg("value", Top.Datum.Num)),
+      fun("-", Top.Datum.Num)(arg("value", Top.Datum.Num))
+    ),
+  
     // * Data Operators
     // Returns a reference to a database.
     // STRING -> Database
@@ -58,6 +151,10 @@ object ApiDefinitions {
       fun(Top.Sequence.Table)(arg("key", Top.Datum.Num))
     ),
 
+    module(termType = 78, name = "getAll")(Top.Datum.Arr)(
+      fun(Top.Sequence.Table)(opt("index", Top.Datum.Str), multiarg("keys", Top.Datum))
+    ),
+
 
     // GET_FIELD  = 31; // OBJECT, STRING -> DATUM
     // | Sequence, STRING -> Sequence
@@ -78,8 +175,64 @@ object ApiDefinitions {
         |[1, 4, 9, 16, 25]
       """.stripMargin
     )(Top.Sequence)(
-        fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
-      ),
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+    ),
+
+    module(termType = 39, name = "filter", doc =
+      """Filter a sequence with either a function or a shortcut
+        |object (see API docs for details).  The body of FILTER is
+        |wrapped in an implicit `.default(false)`, and you can
+        |change the default value by specifying the `default`
+        |optarg.  If you make the default `r.error`, all errors
+        |caught by `default` will be rethrown as if the `default`
+        |did not exist.
+      """.stripMargin
+    )(Top.Sequence)(
+      // Sequence, Function(1), {default:DATUM} -> Sequence |
+      // Sequence, OBJECT, {default:DATUM} -> Sequence
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)), opt("default", Top.Datum)),
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1))),
+      fun(Top.Sequence)(arg("x", Top.Datum), opt("default", Top.Datum)),
+      fun(Top.Sequence)(arg("x", Top.Datum))
+    ),
+
+    // Updates all the rows in a selection.  Calls its Function with the row
+    // to be updated, and then merges the result of that call.
+    // UPDATE   = 53; // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> 
+    // OBJECT |
+    // SingleSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT |
+    // StreamSelection, OBJECT,      {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT |
+    // SingleSelection, OBJECT,      {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT
+    module(termType = 53, name = "update", doc =
+      """Updates all the rows in a selection.  Calls its Function with the row
+        |to be updated, and then merges the result of that call.
+      """.stripMargin
+    )(Top.Datum.Obj)(
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.FunctionArg(1))
+        ),
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.FunctionArg(1)),
+          opt("non_atomic", Top.Datum.Bool)
+        ),
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.FunctionArg(1)),
+          opt("non_atomic", Top.Datum.Bool),
+          opt("durability", Top.Datum.Str)
+        ),
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.Datum.Obj)
+        ),
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.Datum.Obj),
+          opt("non_atomic", Top.Datum.Bool)
+        ),
+        fun(Top.Datum.SingleSelection)(
+          arg("f", Top.Datum.Obj),
+          opt("non_atomic", Top.Datum.Bool),
+          opt("durability", Top.Datum.Str)
+        )
+    ),
 
     // Table, OBJECT, {conflict:STRING, durability:STRING, return_changes:BOOL} -> OBJECT |
     // Table, Sequence, {conflict:STRING, durability:STRING, return_changes:BOOL} -> OBJECT
@@ -118,8 +271,14 @@ object ApiDefinitions {
     //
     //----------------------------------------------------
 
+    module(termType = 102, name = "toEpochTime",
+      doc="Returns seconds since epoch in UTC given a time."
+    )(Top.Datum.Num)(
+      fun(Top.PseudoType.Time)()
+    ),
+      
     module(termType = 103, name = "now")(Top.PseudoType.Time)(fun()),
-    module(termType = 103, name = "inTimezone", doc =
+    module(termType = 104, name = "inTimezone", doc =
       """
         |Puts a time into an ISO 8601 timezone.
       """.stripMargin)(Top.Datum)(

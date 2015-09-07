@@ -3,14 +3,13 @@ package reql.akka
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 
-import akka.actor.{Actor, ActorRef, Terminated}
+import akka.actor.{Props, Actor, ActorRef, Terminated}
 import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import reql.dsl.ReqlArg
 import reql.protocol._
 
-class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
-                        authKey: Option[String] = None)
+class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
 
   extends Actor with ReqlConnection {
 
@@ -139,6 +138,11 @@ class ReqlTcpConnection(remote: InetSocketAddress = new InetSocketAddress("local
 }
 
 object ReqlTcpConnection {
+
+  def props(remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
+            authKey: Option[String] = None): Props = {
+    Props(classOf[ReqlTcpConnection], remote, authKey)
+  } 
 
   private[reql] case object Ack extends Tcp.Event
 

@@ -1,7 +1,7 @@
 
 sealed trait Top
 
-object Top {
+object Top extends Top {
 
   val all = Seq(
     Top.Arr, Top.Database, Top.Datum, Top.Error, Top.Function,
