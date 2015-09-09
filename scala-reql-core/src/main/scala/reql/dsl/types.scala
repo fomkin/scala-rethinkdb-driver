@@ -5,7 +5,7 @@ package reql.dsl
  */
 object types {
 
-  trait AnyType extends ReqlArg with Sequence with Database
+  trait AnyType extends ReqlArg with Top with Sequence with Database
   with Function with Obj with Null with Num with Str
   with Bool with Time with Ordering with Pathspec
 
@@ -61,11 +61,17 @@ object types {
   
   object Var {
     def apply(n: Int): Var = new Var {
+      override def toString = s"var:$n"
       val json = s"[10, [$n]]"
     }
   }
   
   trait Var extends AnyType
+  
+  object EmptyOption extends AnyType {
+    override def toString = "?"
+    val json: String = ""
+  }
   
   def extractJson(from: ReqlArg): String = from.json
 

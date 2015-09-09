@@ -17,6 +17,7 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
   val r = rethinkdb
     
   val Null = new Datum {
+    override def toString = "null"
     val json = "null"
   }  
   
@@ -32,25 +33,8 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
    *   text = "Hello world"
    * )
    */
-  val document = new Dynamic {
-    
-    val empty = new Obj {
-      val json = s"[3, [], {}]"
-    }
-    
-    def applyDynamicNamed(method: String)(args: (String, ReqlArg)*): Obj = new Obj {
-      val json = {
-        val optArgs = {
-          val xs = args map {
-            case (k, v) ⇒ s""""$k": ${v.json}"""
-          }
-          xs.mkString(",")
-        }
-        s"[3, [], {$optArgs}]"
-      }
-    }
-  }
-
+  val document = new ReqlDocumentDsl()
+  
   /**
    * Use it to create Datum.
    *
@@ -61,7 +45,12 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
    */
   val list = new Dynamic {
     def applyDynamic(method: String)(args: ReqlArg*): Arr = new Arr {
+      override def toString = "[" + args.mkString(", ") + "]"
       val json = s"[2, [${args.map(_.json).mkString(",")}]]"
     }
+  }
+  
+  implicit def toTableSpecialOps(table: types.Table): TableSpecialOps = {
+    new TableSpecialOps(table)
   }
 }

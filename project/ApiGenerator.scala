@@ -1,5 +1,4 @@
-import sbt.File
-import sbt._
+import sbt.{File, _}
 
 class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
 
@@ -45,19 +44,25 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
   private[this] def genFunc(module: module, func: fun, hasDep: Boolean) = {
     // Header
     val funcName = nameToCamelCase(func.customName.getOrElse(module.name), isClass = false)
-    val argsDef = {
-      val xs = func.args.map { arg ⇒
+    val argsDef = func.args.collect {
+      case arg @ multiarg(_, _: Top.FunctionArg) ⇒
         val name = nameToCamelCase(arg.name)
         val tpe = topToName(arg.tpe)
-        if (arg.isMulti) {
-          arg.tpe match {
-            case _: Top.FunctionArg ⇒ s"$name: ($tpe)*"
-            case _ ⇒ s"$name: $tpe*"
-          }
-        }
-        else s"$name: $tpe"
-      }
-      xs.mkString(", ")
+        s"$name: ($tpe)*"
+      case arg: multiarg ⇒
+        val name = nameToCamelCase(arg.name)
+        val tpe = topToName(arg.tpe)
+        s"$name: $tpe*"
+      case arg: arg ⇒
+        val name = nameToCamelCase(arg.name)
+        val tpe = topToName(arg.tpe)
+        s"$name: $tpe"
+    }
+    val optsDef = func.args.collect {
+      case arg: opt ⇒
+        val name = nameToCamelCase(arg.name)
+        val tpe = topToName(arg.tpe)
+        s"$name: $tpe = EmptyOption"
     }
     // Body
     val args = {
@@ -76,13 +81,48 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       else xs.mkString(", ")
     }
     val opts = {
-      val xs = func.args.collect {
-        case opt(name, _) ⇒
-          val ccName = "${extractJson(" + nameToCamelCase(name) + ")}"
-          s""""$name" : $ccName"""
-      }
-      xs.mkString(", ")
+//      val xs = func.args.zipWithIndex.collect {
+//        case (opt(name, _), i) ⇒
+//          val ccName = nameToCamelCase(name)
+//          val comma = if (i < func.args.length - 1) """ + "," """ else ""
+//          val x = s""" "$name:" + extractJson($ccName)""" + comma
+//          "${if("+ccName+" != EmptyOption)" + x + """ else ""}"""
+//      }
+//      xs.mkString
+      //      val xs = func.args.collect { case opt(name, _) ⇒ nameToCamelCase(name) }
+      //      "{" + s"""Seq(${xs.mkString(",")}).map(extractJson).mkString(",")""" + "}"
+      val xs = func.args.collect { case x: opt ⇒ x }
+      val genMap = s"""val opts = Map(${xs.map(x ⇒ s""" "${x.name}" -> ${nameToCamelCase(x.name)}""").mkString(",")})"""
+      val genPrinter = """opts.filter(_._2 != EmptyOption).map{ case (k,v) => "\""+k+"\":"+extractJson(v)}"""
+      "${" + s"""$genMap; $genPrinter.mkString(",") """ + "}"
     }
+    val ret = module.dataTypes.map(topToName).mkString(" with ")
+
+    val toStrWithoutOpts = {
+      val xs = func.args.collect {
+        case x: arg =>
+          val ccName = nameToCamelCase(x.name)
+          ccName + " = ${"+ccName+".toString}"
+        case x: multiarg =>
+          val ccName = nameToCamelCase(x.name)
+          ccName + " = [${"+ccName+".mkString(\",\")}]"
+      }
+      "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
+    }
+
+    val toStrDep = {
+      if (hasDep) """self.toString + "." + """
+      else ""
+    }
+    
+    val toStrWithOpts = {
+      val xs = func.args.map { x =>
+        val ccName = nameToCamelCase(x.name)
+        ccName + " = ${"+ccName+".toString}"
+      }
+      "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
+    }
+
     val doc = {
       val lines = module.doc.fold("") { s ⇒
         s.split("\n").map("   * " + _).mkString("\n")
@@ -93,29 +133,34 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |   */
        """.stripMargin
     }
-    val ret = module.dataTypes.map(topToName).mkString(" with ")
-//    val varFunDef = if (func.args.nonEmpty) {
-//      val varArgsDef = {
-//        val xs = func.args map { arg ⇒
-//          val name = nameToCamelCase(arg.name)
-//          if (arg.isMulti) s"$name: Var*"
-//          else s"$name: Var"
-//        }
-//        xs.mkString(", ")
-//      }
-//      s"""
-//         |  def $funcName($varArgsDef): $ret = new $ret {
-//         |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
-//         |  }
-//       """
-//    } else {
-//      ""
-//    }
-    s"""
-       |$doc
-       |  def $funcName($argsDef): $ret = new $ret {
-       |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
-       |  }
+
+    val withoutOps = {
+      val argsDefStr = {
+        if (argsDef.isEmpty) ""
+        else "(" + argsDef.mkString(", ") + ")"
+      }
+      s"""  def $funcName$argsDefStr: $ret = new $ret {
+         |    // Without opts
+         |    val json = s\"\""[${module.termType},[$args]]\"\""
+         |    override def toString: String = $toStrDep$toStrWithoutOpts
+         |  }
+     """.stripMargin
+    }
+    val withOps = if (optsDef.nonEmpty) {
+      val argsDefStr = argsDef.foldLeft("")(_ + _ + ", ")
+      val optsDefStr = optsDef.mkString(", ")
+      s"""  def $funcName($argsDefStr$optsDefStr): $ret = new $ret {
+         |    // With opts
+         |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
+         |    override def toString: String = $toStrDep$toStrWithOpts
+         |  }
+       """.stripMargin
+    } else {
+      ""
+    }
+    s"""$doc
+       |$withoutOps
+       |$withOps
      """.stripMargin
   }
 
@@ -138,6 +183,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
            |
            |import reql.dsl.types._
            |
+           |// Generated code. Do not modify
            |final class $className(val self: $tpeName) extends AnyVal {
            |$funDefs
            |}
@@ -161,6 +207,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |
          |import reql.dsl.types._
          |
+         |// Generated code. Do not modify
          |trait ReqlTermOpsConversions {
          |$defs
          |}
@@ -183,6 +230,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |
          |import reql.dsl.types._
          |
+         |// Generated code. Do not modify|
          |class ReqlTopLevelApi {
          |$funDefs
          |}

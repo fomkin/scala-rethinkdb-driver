@@ -18,4 +18,9 @@ object ReqlQueryException {
   case object End extends ReqlQueryException
 } 
 
-case class ThrowableReqlQueryException(value: ReqlQueryException) extends Throwable
+case class ThrowableReqlQueryException(value: ReqlQueryException, 
+                                       query: ReqlArg) 
+  extends Throwable {
+  
+  override def toString: String = s"$value in $query"  
+}

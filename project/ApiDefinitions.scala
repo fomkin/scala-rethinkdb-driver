@@ -133,13 +133,6 @@ object ApiDefinitions {
           arg("name", Top.Datum.Str),
           opt("read_mode", Top.Datum.Str),
           opt("identifier_format", Top.Datum.Str)
-        ),
-        fun(Top.Database)(
-          arg("name", Top.Datum.Str)
-        ),
-        fun(Top.Database)(
-          arg("name", Top.Datum.Str),
-          opt("read_mode", Top.Datum.Str)
         )
       ),
 
@@ -147,15 +140,18 @@ object ApiDefinitions {
     // Table, STRING -> SingleSelection | Table, NUMBER -> SingleSelection |
     // Table, STRING -> NULL            | Table, NUMBER -> NULL |
     module(termType = 16, name = "get")(Top.Datum.SingleSelection)(
-      fun(Top.Sequence.Table)(arg("key", Top.Datum.Str)),
-      fun(Top.Sequence.Table)(arg("key", Top.Datum.Num))
+      fun(Top.Sequence.Table)(arg("key", Top.Datum))
     ),
 
-    module(termType = 78, name = "getAll")(Top.Datum.Arr)(
-      fun(Top.Sequence.Table)(opt("index", Top.Datum.Str), multiarg("keys", Top.Datum))
+//    module(termType = 78, name = "getAll")(Top.Datum.Arr)(
+//      fun(Top.Sequence.Table)(multiarg("keys", Top.Datum), opt("index", Top.Datum.Str))
+//    ),
+    
+    // Sequence -> BOOL
+    module(termType = 86, name = "isEmpty")(Top.Datum.Bool)(
+      fun(Top.Sequence)()
     ),
-
-
+  
     // GET_FIELD  = 31; // OBJECT, STRING -> DATUM
     // | Sequence, STRING -> Sequence
     module(termType = 31, name = "getField")(Top.AnyType)(
@@ -190,12 +186,16 @@ object ApiDefinitions {
     )(Top.Sequence)(
       // Sequence, Function(1), {default:DATUM} -> Sequence |
       // Sequence, OBJECT, {default:DATUM} -> Sequence
-      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)), opt("default", Top.Datum)),
-      fun(Top.Sequence)(arg("f", Top.FunctionArg(1))),
-      fun(Top.Sequence)(arg("x", Top.Datum), opt("default", Top.Datum)),
-      fun(Top.Sequence)(arg("x", Top.Datum))
+      fun("filterF", Top.Sequence)(arg("f", Top.FunctionArg(1)), opt("default", Top.Datum)),
+      fun(Top.Sequence)(arg("x", Top.Datum), opt("default", Top.Datum))
     ),
 
+    //BRACKET = 170; // Sequence | OBJECT, NUMBER | STRING -> DATUM
+    module(termType = 170, name = "apply")(Top.Datum)(
+      fun(Top.Datum)(arg("field", Top.Datum.Str)),
+      fun(Top.Datum)(arg("i", Top.Datum.Num))
+    ),
+  
     // Updates all the rows in a selection.  Calls its Function with the row
     // to be updated, and then merges the result of that call.
     // UPDATE   = 53; // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> 
@@ -208,29 +208,17 @@ object ApiDefinitions {
         |to be updated, and then merges the result of that call.
       """.stripMargin
     )(Top.Datum.Obj)(
-        fun(Top.Datum.SingleSelection)(
-          arg("f", Top.FunctionArg(1))
-        ),
-        fun(Top.Datum.SingleSelection)(
-          arg("f", Top.FunctionArg(1)),
-          opt("non_atomic", Top.Datum.Bool)
-        ),
-        fun(Top.Datum.SingleSelection)(
+        fun("updateF", Top.Datum.SingleSelection)(
           arg("f", Top.FunctionArg(1)),
           opt("non_atomic", Top.Datum.Bool),
-          opt("durability", Top.Datum.Str)
+          opt("durability", Top.Datum.Str),
+          opt("return_changes", Top.Datum.Bool)
         ),
         fun(Top.Datum.SingleSelection)(
-          arg("f", Top.Datum.Obj)
-        ),
-        fun(Top.Datum.SingleSelection)(
-          arg("f", Top.Datum.Obj),
-          opt("non_atomic", Top.Datum.Bool)
-        ),
-        fun(Top.Datum.SingleSelection)(
-          arg("f", Top.Datum.Obj),
+          arg("obj", Top.Datum.Obj),
           opt("non_atomic", Top.Datum.Bool),
-          opt("durability", Top.Datum.Str)
+          opt("durability", Top.Datum.Str),
+          opt("return_changes", Top.Datum.Bool)
         )
     ),
 
@@ -250,9 +238,13 @@ object ApiDefinitions {
         |}}}
       """.stripMargin
     )(Top.Datum.Obj)(
-        fun(Top.Sequence.Table)(arg("data", Top.Datum.Obj)),
-        fun(Top.Sequence.Table)(arg("data", Top.Sequence))
-      ),
+      fun(Top.Sequence.Table)(
+        arg("data", Top.Datum.Obj),
+        opt("conflict", Top.Datum.Str),
+        opt("durability", Top.Datum.Str),
+        opt("return_changes", Top.Datum.Bool)
+      )
+    ),
 
     // SEQUENCE, STRING -> GROUPED_SEQUENCE | SEQUENCE, FUNCTION -> GROUPED_SEQUENCE
     genGroupModule(144, "group"),
