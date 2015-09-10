@@ -195,19 +195,15 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   override def unhandled(message: Any): Unit = {
     message match {
       case ReqlTcpConnection.Response(token, rawData) ⇒
-        println("Response")
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom ⇒
-            println(pr)
             atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Sequence if pr.partial ⇒
-            println(pr)
             val cursor = activeCursors.getOrElseUpdate(
               token, registerCursorForPartialResponse(token))
             pr.xs.foreach(cursor.append(_, close = false))
           case pr: ParsedResponse.Sequence if !pr.partial ⇒
-            println(pr)
             activeCursors.get(token) match {
               case Some(cursor) ⇒ appendSequenceToCursorAndClose(cursor, pr.xs.toList)
               case None ⇒ cursorCallbacks.get(token) foreach { cb ⇒
@@ -218,7 +214,6 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
             }
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Error ⇒
-            println(pr)
             val ex = ReqlQueryException.ReqlErrorResponse(pr.tpe, pr.text)
             dbConnection ! ForgetQuery(token)
             activeCursors.get(token) match {
@@ -239,7 +234,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
         }
       case RegisterCursorCb(token, f) ⇒ 
         cursorCallbacks(token) = f
-      case RegisterAtomCb(token, f) ⇒ 
+      case a @ RegisterAtomCb(token, f) ⇒
         atomCallbacks(token) = f
       case _ ⇒
         super.unhandled(message)

@@ -2,6 +2,7 @@ package reql.akka
 
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
+import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor.{Props, Actor, ActorRef, Terminated}
 import akka.io.{IO, Tcp}
@@ -31,6 +32,8 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
   //
   //---------------------------------------------------------------------------
 
+  val tokenFactory = new AtomicLong()
+
   val queries = scala.collection.mutable.Map.empty[Long, ActorRef]
 
   var pendingQueries = List.empty[PendingQuery]
@@ -47,9 +50,10 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
 
   def connecting: Receive = {
     case StartQuery(query, optReceiver) ⇒
-      val receiver = optReceiver.getOrElse(sender())
+      val sndr = sender()
+      val receiver = optReceiver.getOrElse(sndr)
       context watch receiver
-      pendingQueries ::=(sender(), receiver, query)
+      pendingQueries ::= (sndr, receiver, query)
     case c: Tcp.Connected ⇒
       val handshakeBuffer = createHandshakeBuffer(authKey)
       val connection = sender()
@@ -62,9 +66,10 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
       // Send pending queries
       pendingQueries foreach {
         case (sender, receiver, json) ⇒
-          val token = startQuery(json)
-          // Tel asker about query token
+          val token = tokenFactory.incrementAndGet()
           sender ! token
+          startQuery(token, json)
+          // Tel asker about query token
           queries(token) = receiver
       }
       pendingQueries = Nil
@@ -75,22 +80,19 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
   def operating: Receive = {
     case StartQuery(query, optReceiver) ⇒
       val receiver = optReceiver.getOrElse(sender())
-      val token = startQuery(query)
-      println(s"RTC: StartQuery $token")
+      val token = tokenFactory.incrementAndGet()
+      sender() ! token
+      startQuery(token, query)
       context watch receiver
       queries(token) = receiver
-      sender ! token
     case StopQuery(queryToken) ⇒
-      println(s"RTC: StopQuery $queryToken")
       stopQuery(queryToken)
       queries.remove(queryToken) foreach { refToUnwatch ⇒
         tryToUnwatchListener(refToUnwatch)
       }
     case ForgetQuery(token) ⇒
-      println(s"RTC: ForgetQuery $token")
       queries.remove(token).foreach(tryToUnwatchListener)
     case ContinueQuery(token) ⇒
-      println(s"RTC: ContinueQuery $token")
       continueQuery(token)
     case Tcp.Received(data) ⇒
       processData(data.asByteBuffer)
@@ -129,9 +131,7 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
   }
 
   protected def onResponse(queryToken: Long, data: Array[Byte]): Unit = {
-    println("Try to send to actor")
     queries.get(queryToken) foreach { ref ⇒
-      println("Actor found")
       ref ! ReqlTcpConnection.Response(queryToken, data)
     }
   }

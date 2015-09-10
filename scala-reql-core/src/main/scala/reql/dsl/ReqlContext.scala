@@ -77,7 +77,7 @@ object ReqlContext {
 
     def runA(implicit c: ReqlContext[Data]): Future[Data] = {
       val p = Promise[Data]()
-      c.runAtomQuery[Unit](self) { res: Either[ReqlQueryException, Data]  ⇒
+      c.runAtomQuery[Unit](self) { res: Either[ReqlQueryException, Data] ⇒
         res match {
           case Right(value) ⇒ p.success(value)
           case Left(value) ⇒

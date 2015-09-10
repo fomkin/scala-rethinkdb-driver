@@ -2,7 +2,6 @@ package reql.protocol
 
 import java.nio.charset.StandardCharsets
 import java.nio.{ByteBuffer, ByteOrder}
-import java.util.concurrent.atomic.AtomicLong
 
 import reql.dsl.ReqlArg
 
@@ -26,8 +25,7 @@ trait ReqlConnection {
    * @param data Prepared query
    * @return Query unique token
    */
-  def startQuery(data: ReqlArg): Long = {
-    val token = tokenFactory.incrementAndGet()
+  def startQuery(token: Long, data: ReqlArg): Long = {
     val json = s"[${ReqlQueryType.Start.value}, ${data.json}]"
     val jsonBuffer = ByteBuffer.wrap(json.getBytes("UTF-8"))
     send(token, jsonBuffer)
@@ -35,7 +33,6 @@ trait ReqlConnection {
   }
 
   def continueQuery(token: Long) = {
-    println("Continue query")
     send(token, ContinueBuffer)
   }
 
@@ -60,7 +57,6 @@ trait ReqlConnection {
    * @param data Raw data from connection
    */
   protected def processData(data: ByteBuffer): Unit = {
-    println(s"${data.capacity()} bytes received")
     // Update buffer
     buffer.position(0)
     buffer = ByteBuffer.allocate(buffer.capacity + data.capacity).
@@ -81,10 +77,8 @@ trait ReqlConnection {
           val queryToken = buffer.getLong(0)
           val responseLength = buffer.getInt(8)
           val messageSize = HeaderSize + responseLength
-          println(s"responseLength=$responseLength, buffer.capacity=${buffer.capacity}")
           // Enough for body
           if (buffer.capacity >= messageSize) {
-            println("Enough for body")
             val jsonBytes = new Array[Byte](responseLength)
             buffer.position(HeaderSize)
             buffer.get(jsonBytes)
@@ -154,8 +148,6 @@ trait ReqlConnection {
   //---------------------------------------------------------------------------
 
   private[this] var state: Int = Handshake
-
-  private[this] val tokenFactory = new AtomicLong()
 
   private[this] var buffer: ByteBuffer = ByteBuffer.allocate(0)
 
