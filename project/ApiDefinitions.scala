@@ -101,7 +101,14 @@ object ApiDefinitions {
       fun(Top.Datum.Num)(arg("value", Top.Datum.Num)),
       fun("-", Top.Datum.Num)(arg("value", Top.Datum.Num))
     ),
+
+    module(termType = 57, name = "dbCreate")(Top.Datum.Obj)(
+      fun(arg("name", Top.Datum.Str))
+    ),
   
+    // DB_LIST       = 59; // -> ARRAY
+    module(termType = 59, name = "dbList")(Top.Datum.Arr)(fun()),
+
     // * Data Operators
     // Returns a reference to a database.
     // STRING -> Database
@@ -135,6 +142,38 @@ object ApiDefinitions {
           opt("identifier_format", Top.Datum.Str)
         )
       ),
+
+    /*
+      TABLE_CREATE  = 60; // Database, STRING, {primary_key:STRING, shards:NUMBER, replicas:NUMBER, primary_replica_tag:STRING} -> OBJECT
+                          // Database, STRING, {primary_key:STRING, shards:NUMBER, replicas:OBJECT, primary_replica_tag:STRING} -> OBJECT
+                          // STRING, {primary_key:STRING, shards:NUMBER, replicas:NUMBER, primary_replica_tag:STRING} -> OBJECT
+                          // STRING, {primary_key:STRING, shards:NUMBER, replicas:OBJECT, primary_replica_tag:STRING} -> OBJECT
+    
+     */
+    module(termType = 60, name = "tableCreate")(Top.Datum.Obj)(
+      fun(Top.Database)(
+        arg("name", Top.Datum.Str),
+        opt("primary_key", Top.Datum.Str),
+        opt("shards", Top.Datum.Num),
+        opt("replicas", Top.Datum),
+        opt("primary_replica_tag", Top.Datum.Str)
+      )
+    ),
+
+    // INDEX_CREATE = 75; 
+    // Table, STRING, Function(1), {multi:BOOL} -> OBJECT
+    module(termType = 75, name = "indexCreate")(Top.Datum.Obj)(
+      fun(Top.Sequence.Table)(
+        arg("name", Top.Datum.Str),
+        opt("multi", Top.Datum.Bool),
+        opt("geo", Top.Datum.Bool)
+      ),
+      fun("indexCreateF", Top.Sequence.Table)(
+        arg("f", Top.FunctionArg(1)),
+        opt("multi", Top.Datum.Bool),
+        opt("geo", Top.Datum.Bool)
+      )
+    ),
 
     // Gets a single element from a table by its primary or a secondary key.
     // Table, STRING -> SingleSelection | Table, NUMBER -> SingleSelection |

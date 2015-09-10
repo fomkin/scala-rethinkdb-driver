@@ -43,12 +43,7 @@ trait ReqlEntryPoint extends ReqlTermOpsConversions with ReqlTypesConversions {
    *   animals = list("Cat", "Dog", "Duck")   
    * )
    */
-  val list = new Dynamic {
-    def applyDynamic(method: String)(args: ReqlArg*): Arr = new Arr {
-      override def toString = "[" + args.mkString(", ") + "]"
-      val json = s"[2, [${args.map(_.json).mkString(",")}]]"
-    }
-  }
+  val array = new ReqlArrayDsl()
   
   implicit def toTableSpecialOps(table: types.Table): TableSpecialOps = {
     new TableSpecialOps(table)
