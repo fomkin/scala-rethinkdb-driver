@@ -1,12 +1,12 @@
 package reql.akka
 
 import akka.actor.{Actor, ActorRef}
-import akka.pattern.ask
 import akka.util.Timeout
 import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.util.Random
 
 trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
@@ -34,19 +34,17 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   //---------------------------------------------------------------------------
 
   def runCursorQuery[U](query: ReqlArg)(f: CursorCb[Data]): Unit = {
-    import context.dispatcher
-    val message = StartQuery(query, Some(self))
-    dbConnection.ask(message)(queryTimeout).mapTo[Long] foreach { token ⇒
-      self ! RegisterCursorCb(token, f)
-    }
+    val token = Random.nextLong()
+    val message = StartQuery(token, query)
+    cursorCallbacks(token) = f
+    dbConnection ! message
   }
 
   def runAtomQuery[U](query: ReqlArg)(f: AtomCb[Data]): Unit = {
-    import context.dispatcher
-    val message = StartQuery(query, Some(self))
-    dbConnection.ask(message)(queryTimeout).mapTo[Long] foreach { token ⇒
-      self ! RegisterAtomCb(token, f)
-    }
+    val token = Random.nextLong()
+    val message = StartQuery(token, query)
+    atomCallbacks(token) = f
+    dbConnection ! message
   }
   
   //---------------------------------------------------------------------------
@@ -55,10 +53,6 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   //
   //---------------------------------------------------------------------------
   
-  private[this] case class RegisterAtomCb(token: Long, cb: AtomCb[Data])
-
-  private[this] case class RegisterCursorCb(token: Long, cb: CursorCb[Data])
-
   private[this] class CursorImpl(token: Long) extends Cursor[Data] {
 
     sealed trait CursorState
@@ -216,26 +210,22 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
           case pr: ParsedResponse.Error ⇒
             val ex = ReqlQueryException.ReqlErrorResponse(pr.tpe, pr.text)
             dbConnection ! ForgetQuery(token)
-            activeCursors.get(token) match {
+            activeCursors.remove(token) match {
               case Some(cursor) ⇒
                 cursor.fail(ex)
               case None ⇒
-                cursorCallbacks.get(token) match {
+                cursorCallbacks.remove(token) match {
                   case Some(cb) ⇒
                     val cursor = new CursorImpl(token)
                     cursor.fail(ex)
                     cb(cursor)
                   case None ⇒
-                    atomCallbacks.get(token) foreach { cb ⇒
+                    atomCallbacks.remove(token) foreach { cb ⇒
                       cb(Left(ex))
                     } 
                 }
             } 
         }
-      case RegisterCursorCb(token, f) ⇒ 
-        cursorCallbacks(token) = f
-      case a @ RegisterAtomCb(token, f) ⇒
-        atomCallbacks(token) = f
       case _ ⇒
         super.unhandled(message)
     }
