@@ -50,6 +50,11 @@ trait ReqlConnection {
 
   protected def onResponse(token: Long, data: Array[Byte]): Unit
 
+  protected def reset(): Unit = {
+    state = Handshake
+    buffer = ByteBuffer.allocate(0)
+  }
+
   /**
    * Process data from RethinkDB server when connection
    * was established and handshake was successful.

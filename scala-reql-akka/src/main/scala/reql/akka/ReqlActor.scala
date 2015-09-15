@@ -2,6 +2,7 @@ package reql.akka
 
 import akka.actor.{Actor, ActorRef}
 import akka.util.Timeout
+import reql.dsl.ReqlQueryException.ReqlErrorResponse
 import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
 import scala.annotation.tailrec
@@ -65,7 +66,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
     case class Foreach(f: Either[ReqlQueryException, Data] ⇒ _) extends CursorState
 
-    case class Failed(e: ReqlQueryException.ReqlErrorResponse) extends CursorState
+    case class Failed(e: ReqlQueryException) extends CursorState
     
     var state: CursorState = Idle
 
@@ -132,7 +133,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
       }
     }
 
-    def fail(exception: ReqlQueryException.ReqlErrorResponse): Unit = state match {
+    def fail(exception: ReqlQueryException): Unit = state match {
       case Idle ⇒ state = Failed(exception)
       case Foreach(f) ⇒ f(Left(exception))
       case Next(f) ⇒ f(Left(exception))
@@ -226,6 +227,24 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
                 }
             } 
         }
+      case ReqlTcpConnection.ConnectionClosed ⇒
+        activeCursors foreach {
+          case (k, v) ⇒
+            v.fail(ReqlQueryException.ConnectionError)
+        }
+        atomCallbacks foreach {
+          case (k, v) ⇒
+            v(Left(ReqlQueryException.ConnectionError))
+        }
+        cursorCallbacks foreach {
+          case (k, v) ⇒
+            val cursor = new CursorImpl(k)
+            cursor.fail(ReqlQueryException.ConnectionError)
+            v(cursor)
+        }
+        cursorCallbacks.clear()
+        atomCallbacks.clear()
+        activeCursors.clear()
       case _ ⇒
         super.unhandled(message)
     }

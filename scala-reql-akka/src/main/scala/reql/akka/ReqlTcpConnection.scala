@@ -9,6 +9,8 @@ import akka.util.ByteString
 import reql.dsl.ReqlArg
 import reql.protocol._
 
+import scala.concurrent.duration._
+
 class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
 
   extends Actor with ReqlConnection {
@@ -21,9 +23,9 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
   type PendingQuery = (Long, ActorRef, ReqlArg)
 
   import ReqlTcpConnection._
-  import context.system
+  import context.{dispatcher, system}
 
-  IO(Tcp) ! Tcp.Connect(remote, pullMode = true)
+  establishConnection()
 
   //---------------------------------------------------------------------------
   //
@@ -49,8 +51,9 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
     case StartQuery(token, query) ⇒
       val sndr = sender()
       context watch sndr
-      pendingQueries ::= (token, sndr, query)
+      pendingQueries ::=(token, sndr, query)
     case c: Tcp.Connected ⇒
+      reset()
       val handshakeBuffer = createHandshakeBuffer(authKey)
       val connection = sender()
       this.tcpConnection = Some(connection)
@@ -67,7 +70,9 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
       }
       pendingQueries = Nil
     case Tcp.CommandFailed(_: Tcp.Connect) ⇒
-      context stop self
+      context.system.scheduler.scheduleOnce(ReconnectInterval) {
+        establishConnection()
+      }
   }
 
   def operating: Receive = {
@@ -89,22 +94,32 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
       processData(data.asByteBuffer)
     case ReqlTcpConnection.Ack ⇒
       tcpConnection foreach (_ ! Tcp.ResumeReading)
+    case _: Tcp.ConnectionClosed =>
+      tcpConnection foreach context.unwatch
+      tcpConnection = None
+      for ((token, (receiver)) ← queries) {
+        receiver ! ConnectionClosed
+      }
+      establishConnection()
+      context.unbecome()
   }
 
   override def unhandled(message: Any): Unit = message match {
-    case Terminated(tcp) if tcpConnection.contains(tcp) ⇒
-      context stop self
-    case x @ Terminated(subject) ⇒
+    case Terminated(subject) ⇒
       queries.retain((k, v) ⇒ v != subject)
       pendingQueries = pendingQueries filter {
         case (sender, receiver, _) ⇒ receiver != subject
       }
-    case x ⇒ super.unhandled(x)
+    case _ ⇒ super.unhandled(message)
   }
 
   def tryToUnwatchListener(refToUnwatch: ActorRef): Unit = {
     val exists = queries.exists { case (k, v) ⇒ v == refToUnwatch }
     if (!exists) context unwatch refToUnwatch
+  }
+
+  def establishConnection(): Unit = {
+    IO(Tcp) ! Tcp.Connect(remote, pullMode = true)
   }
 
   //---------------------------------------------------------------------------
@@ -133,7 +148,9 @@ object ReqlTcpConnection {
   def props(remote: InetSocketAddress = new InetSocketAddress("localhost", 28015),
             authKey: Option[String] = None): Props = {
     Props(classOf[ReqlTcpConnection], remote, authKey)
-  } 
+  }
+
+  private[reql] val ReconnectInterval = 2 seconds
 
   private[reql] case object Ack extends Tcp.Event
 
@@ -145,6 +162,8 @@ object ReqlTcpConnection {
 
   case class Response(token: Long, data: Array[Byte])
     extends ReqlConnectionEvent
+
+  case object ConnectionClosed extends ReqlConnectionEvent
 
   //------------------------------------------------
   // Commands

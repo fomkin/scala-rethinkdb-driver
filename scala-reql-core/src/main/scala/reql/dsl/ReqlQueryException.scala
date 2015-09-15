@@ -16,6 +16,8 @@ object ReqlQueryException {
    * End of cursor
    */
   case object End extends ReqlQueryException
+  
+  case object ConnectionError extends ReqlQueryException
 } 
 
 case class ThrowableReqlQueryException(value: ReqlQueryException, 
