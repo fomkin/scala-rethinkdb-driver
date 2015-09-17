@@ -197,6 +197,12 @@ object ApiDefinitions {
       fun(Top.Datum.Obj)(arg("field_name", Top.Datum.Str))
     ),
 
+    //PLUCK    = 33; // Sequence, Pathspec... -> Sequence | OBJECT, Pathspec... -> OBJECT
+    module(termType = 33, name = "pluck")(Top.AnyType)(
+      fun(Top.Sequence)(multiarg("cols", Top.Datum.Str)),
+      fun(Top.Datum.Obj)(multiarg("cols", Top.Datum.Str))
+    ),
+
     module(termType = 38, name = "map", doc =
       """
         |Transform each element of one or more sequences by applying a mapping function to them. If map is run with two or more sequences, it will iterate for as many items as there are in the shortest sequence.

@@ -92,6 +92,7 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
       continueQuery(token)
     case Tcp.Received(data) ⇒
       processData(data.asByteBuffer)
+      tcpConnection foreach (_ ! Tcp.ResumeReading)
     case ReqlTcpConnection.Ack ⇒
       tcpConnection foreach (_ ! Tcp.ResumeReading)
     case _: Tcp.ConnectionClosed =>
