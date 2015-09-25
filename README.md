@@ -1,5 +1,7 @@
 ### Scala RethinkDB Driver
 
+[![Join the chat at https://gitter.im/fomkin/scala-reql](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fomkin/scala-reql?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 The idea is to create pure and simple RethinkDB API implementation which
 can be run inside different Scala environments. It means that protocol
 implementation and query eDSL are not depend on thirdparty libraries.
