@@ -300,7 +300,7 @@ object ApiDefinitions {
 
     module(termType = 152, name = "changes")
       (Top.Sequence.Stream)
-      (fun(Top.Sequence.Table)()),
+      (fun(Top.Sequence)()),
 
     //----------------------------------------------------
     //
