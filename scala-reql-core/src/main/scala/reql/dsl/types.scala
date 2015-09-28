@@ -6,7 +6,7 @@ package reql.dsl
 object types {
 
   trait AnyType extends ReqlArg with Top with Sequence with Database
-  with Function with Obj with Null with Num with Str
+  with Function with Obj with Null with Num with Str with Arr
   with Bool with Time with Ordering with Pathspec
 
   trait Top extends ReqlArg

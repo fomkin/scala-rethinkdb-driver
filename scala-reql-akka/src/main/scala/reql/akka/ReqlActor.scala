@@ -2,7 +2,6 @@ package reql.akka
 
 import akka.actor.{Actor, ActorRef}
 import akka.util.Timeout
-import reql.dsl.ReqlQueryException.ReqlErrorResponse
 import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
 import scala.annotation.tailrec

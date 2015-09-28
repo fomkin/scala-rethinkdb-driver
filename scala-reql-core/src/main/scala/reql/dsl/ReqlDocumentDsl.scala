@@ -10,7 +10,8 @@ final class ReqlDocumentDsl extends Dynamic {
     override def toString = "{}" 
   }
 
-  def applyDynamicNamed(method: String)(args: (String, ReqlArg)*): Obj = new Obj {
+  
+  def fromSeq(args: Seq[(String, ReqlArg)]): Obj = new Obj {
     override def toString = {
       val s = args.map { case (k, v) ⇒ s"$k: $v" }
       s"{${s.mkString(", ")}}"
@@ -24,6 +25,12 @@ final class ReqlDocumentDsl extends Dynamic {
       }
       s"[3, [], {$optArgs}]"
     }
+  }
+
+  def fromMap(m: Map[String, ReqlArg]): Obj = fromSeq(m.toSeq)
+
+  def applyDynamicNamed(method: String)(args: (String, ReqlArg)*): Obj = {
+    fromSeq(args)
   }
 
 }

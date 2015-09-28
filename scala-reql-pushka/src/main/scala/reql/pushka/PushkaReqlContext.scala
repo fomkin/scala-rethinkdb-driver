@@ -5,12 +5,16 @@ import java.nio.charset.StandardCharsets
 import pushka.annotation._
 import pushka.json._
 import pushka.{Ast, PushkaException}
-import reql.dsl.ReqlContext
+import reql.dsl.{types, ReqlEntryPoint, ReqlContext}
+import reql.dsl.types.Datum
 import reql.protocol.{ReqlResponseType, ReqlResponseWithError}
+
+import scala.language.implicitConversions
 
 trait PushkaReqlContext extends ReqlContext[Ast] {
 
   import ReqlResponseType._
+  import PushkaReqlContext._
 
   @pushka
   case class PRes(t: Int, r: Ast)
@@ -32,4 +36,39 @@ trait PushkaReqlContext extends ReqlContext[Ast] {
       case response ⇒ throw new PushkaException(s"Unexpected response: $response")
     }
   }
+  
+  implicit def toAstOps(x: Ast): AstOps = new AstOps(x)
+}
+
+object PushkaReqlContext extends ReqlEntryPoint {
+
+  def astToDatum(value: Ast): Datum = value match {
+    case Ast.Obj(m) ⇒
+      document fromMap {
+        m map {
+          case (k, v) ⇒ (k, astToDatum(v))
+        }
+      }
+    case Ast.Str(s) ⇒ toStr(s)
+    case Ast.Num(n) ⇒ toNum(n)
+    case Ast.Arr(xs) ⇒ array(xs.toSeq.map(astToDatum):_*)
+    case Ast.False ⇒ toBool(value = false)
+    case Ast.True ⇒ toBool(value = true)
+    case Ast.Null ⇒ Null
+  }
+
+  final class AstOps(val self: Ast) extends AnyVal {
+    def toDatum: Datum = astToDatum(self)
+    def toObj: types.Obj = self match {
+      case Ast.Obj(m) ⇒
+        document fromMap {
+          m map {
+            case (k, v) ⇒ (k, astToDatum(v))
+          }
+        }
+      case _ ⇒ 
+        throw new ClassCastException(s"$self cannot be converted to reql.dsl.types.Obj")
+    }
+  }
+
 }

@@ -168,7 +168,7 @@ object ApiDefinitions {
         opt("multi", Top.Datum.Bool),
         opt("geo", Top.Datum.Bool)
       ),
-      fun("indexCreateF", Top.Sequence.Table)(
+      fun(Top.Sequence.Table)(
         arg("f", Top.FunctionArg(1)),
         opt("multi", Top.Datum.Bool),
         opt("geo", Top.Datum.Bool)
@@ -231,14 +231,19 @@ object ApiDefinitions {
     )(Top.Sequence)(
       // Sequence, Function(1), {default:DATUM} -> Sequence |
       // Sequence, OBJECT, {default:DATUM} -> Sequence
-      fun("filterF", Top.Sequence)(arg("f", Top.FunctionArg(1)), opt("default", Top.Datum)),
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)), opt("default", Top.Datum)),
       fun(Top.Sequence)(arg("x", Top.Datum), opt("default", Top.Datum))
     ),
 
     //BRACKET = 170; // Sequence | OBJECT, NUMBER | STRING -> DATUM
-    module(termType = 170, name = "apply")(Top.Datum)(
+    module(termType = 170, name = "apply")(Top.AnyType)(
       fun(Top.Datum)(arg("field", Top.Datum.Str)),
       fun(Top.Datum)(arg("i", Top.Datum.Num))
+    ),
+
+    //LIMIT = 71; // Sequence, NUMBER -> Sequence
+    module(termType = 71, name = "limit")(Top.Sequence)(
+      fun(Top.Sequence)(arg("count", Top.Datum.Num))
     ),
   
     // Updates all the rows in a selection.  Calls its Function with the row
@@ -253,7 +258,7 @@ object ApiDefinitions {
         |to be updated, and then merges the result of that call.
       """.stripMargin
     )(Top.Datum.Obj)(
-        fun("updateF", Top.Datum.SingleSelection)(
+        fun(Top.Datum.SingleSelection)(
           arg("f", Top.FunctionArg(1)),
           opt("non_atomic", Top.Datum.Bool),
           opt("durability", Top.Datum.Str),
@@ -298,9 +303,9 @@ object ApiDefinitions {
     genGroupModule(147, "min"),
     genGroupModule(148, "max"),
 
-    module(termType = 152, name = "changes")
-      (Top.Sequence.Stream)
-      (fun(Top.Sequence)()),
+    module(termType = 152, name = "changes")(Top.Sequence.Stream)(
+      fun(Top.Sequence)()
+    ),
 
     //----------------------------------------------------
     //
@@ -345,6 +350,22 @@ object ApiDefinitions {
       """.stripMargin)(Top.Datum.Str)(
         fun(Top.PseudoType.Time)()
       ),
+  
+    // Append a single element to the end of an array (like `snoc`).
+//    APPEND = 29; // ARRAY, DATUM -> ARRAY
+  // Prepend a single element to the end of an array (like `cons`).
+ // PREPEND = 80; // ARRAY, DATUM -> ARRAY
+    module(termType = 29, name = "append")(Top.Arr)(
+      fun(Top.Datum.Arr)(arg("x", Top.Datum))
+    ),
+    module(termType = 80, name = "prepend")(Top.Arr)(
+      fun(Top.Datum.Arr)(arg("x", Top.Datum))
+    ),
+    //CONTAINS = 93; // Sequence, (DATUM | Function(1))... -> BOOL
+    module(termType = 93, name = "contains")(Top.Datum.Bool)(
+      fun(Top.Sequence)(multiarg("x", Top.Datum)),
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+    ),
 
     module(termType = 128, name = "year")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 129, name = "month")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
@@ -394,6 +415,17 @@ object ApiDefinitions {
           arg("seconds", Top.Datum.Num),
           arg("timezone", Top.Datum.Str)
         )
+      ),
+      module(termType = 41, name = "orderBy")(Top.Sequence)(
+        fun(Top.Sequence)(arg("field", Top.Datum.Str), opt("index", Top.Datum.Str)),
+        fun(Top.Sequence)(arg("ordering", Top.Ordering), opt("index", Top.Ordering)),
+        fun(Top.Sequence)(opt("index", Top.Ordering))
+      ),
+      module(termType = 73, name = "asc")(Top.Ordering)(
+        fun(arg("field", Top.Datum.Str))
+      ),
+      module(termType = 74, name = "desc")(Top.Ordering)(
+        fun(arg("field", Top.Datum.Str))
       )
 
     /*
@@ -423,6 +455,7 @@ object ApiDefinitions {
         DECEMBER = 125;  // -> 12
 
      */
+    //ORDER_BY   = 41; // Sequence, (!STRING | Ordering)..., {index: (!STRING | Ordering)} -> Sequence
   )
 
 

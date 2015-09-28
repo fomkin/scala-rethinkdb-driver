@@ -41,127 +41,133 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
     case Top.AnyType ⇒ "AnyType"
   }
 
-  private[this] def genFunc(module: module, func: fun, hasDep: Boolean) = {
-    // Header
-    val funcName = nameToCamelCase(func.customName.getOrElse(module.name), isClass = false)
-    val argsDef = func.args.collect {
-      case arg @ multiarg(_, _: Top.FunctionArg) ⇒
-        val name = nameToCamelCase(arg.name)
-        val tpe = topToName(arg.tpe)
-        s"$name: ($tpe)*"
-      case arg: multiarg ⇒
-        val name = nameToCamelCase(arg.name)
-        val tpe = topToName(arg.tpe)
-        s"$name: $tpe*"
-      case arg: arg ⇒
-        val name = nameToCamelCase(arg.name)
-        val tpe = topToName(arg.tpe)
-        s"$name: $tpe"
-    }
-    val optsDef = func.args.collect {
-      case arg: opt ⇒
-        val name = nameToCamelCase(arg.name)
-        val tpe = topToName(arg.tpe)
-        s"$name: $tpe = EmptyOption"
-    }
-    // Body
-    val args = {
-      val xs = func.args.collect {
-        case arg(name, _) ⇒
-          val ccName = nameToCamelCase(name)
-          "${extractJson(" + ccName + ")}"
-        case multiarg(name, _) ⇒
-          val ccName = nameToCamelCase(name)
-          "${" + ccName + ".map(extractJson).mkString(\", \")}"
+  private[this] def genFuncs(module: module, hasDep: Boolean) = {
+    module.funcs.zipWithIndex map { case (func, i) ⇒
+      // Header
+      val funcName = nameToCamelCase(func.customName.getOrElse(module.name), isClass = false)
+      val argsDef = func.args.collect {
+        case arg@multiarg(_, _: Top.FunctionArg) ⇒
+          val name = nameToCamelCase(arg.name)
+          val tpe = topToName(arg.tpe)
+          s"$name: ($tpe)*"
+        case arg: multiarg ⇒
+          val name = nameToCamelCase(arg.name)
+          val tpe = topToName(arg.tpe)
+          s"$name: $tpe*"
+        case arg: arg ⇒
+          val name = nameToCamelCase(arg.name)
+          val tpe = topToName(arg.tpe)
+          s"$name: $tpe"
       }
-      if (hasDep) {
-        if (xs.isEmpty) "${extractJson(self)}"
-        else "${extractJson(self)}, " + xs.mkString(", ")
+      val optsDef = func.args.collect {
+        case arg: opt ⇒
+          val name = nameToCamelCase(arg.name)
+          val tpe = topToName(arg.tpe)
+          s"$name: $tpe = EmptyOption"
       }
-      else xs.mkString(", ")
-    }
-    val opts = {
-//      val xs = func.args.zipWithIndex.collect {
-//        case (opt(name, _), i) ⇒
-//          val ccName = nameToCamelCase(name)
-//          val comma = if (i < func.args.length - 1) """ + "," """ else ""
-//          val x = s""" "$name:" + extractJson($ccName)""" + comma
-//          "${if("+ccName+" != EmptyOption)" + x + """ else ""}"""
-//      }
-//      xs.mkString
-      //      val xs = func.args.collect { case opt(name, _) ⇒ nameToCamelCase(name) }
-      //      "{" + s"""Seq(${xs.mkString(",")}).map(extractJson).mkString(",")""" + "}"
-      val xs = func.args.collect { case x: opt ⇒ x }
-      val genMap = s"""val opts = Map(${xs.map(x ⇒ s""" "${x.name}" -> ${nameToCamelCase(x.name)}""").mkString(",")})"""
-      val genPrinter = """opts.filter(_._2 != EmptyOption).map{ case (k,v) => "\""+k+"\":"+extractJson(v)}"""
-      "${" + s"""$genMap; $genPrinter.mkString(",") """ + "}"
-    }
-    val ret = module.dataTypes.map(topToName).mkString(" with ")
+      // Body
+      val args = {
+        val xs = func.args.collect {
+          case arg(name, _) ⇒
+            val ccName = nameToCamelCase(name)
+            "${extractJson(" + ccName + ")}"
+          case multiarg(name, _) ⇒
+            val ccName = nameToCamelCase(name)
+            "${" + ccName + ".map(extractJson).mkString(\", \")}"
+        }
+        if (hasDep) {
+          if (xs.isEmpty) "${extractJson(self)}"
+          else "${extractJson(self)}, " + xs.mkString(", ")
+        }
+        else xs.mkString(", ")
+      }
+      val opts = {
+        val xs = func.args.collect { case x: opt ⇒ x }
+        val genMap = s"""val opts = Map(${xs.map(x ⇒ s""" "${x.name}" -> ${nameToCamelCase(x.name)}""").mkString(",")})"""
+        val genPrinter = """opts.filter(_._2 != EmptyOption).map{ case (k,v) => "\""+k+"\":"+extractJson(v)}"""
+        "${" + s"""$genMap; $genPrinter.mkString(",") """ + "}"
+      }
+      val ret = module.dataTypes.map(topToName).mkString(" with ")
+      val complexRet = {
+        if (optsDef.nonEmpty) nameToCamelCase(module.name, isClass = true) + i
+        else ret
+      }
+      val toStrWithoutOpts = {
+        val xs = func.args.collect {
+          case x: arg =>
+            val ccName = nameToCamelCase(x.name)
+            ccName + " = ${" + ccName + ".toString}"
+          case x: multiarg =>
+            val ccName = nameToCamelCase(x.name)
+            ccName + " = [${" + ccName + ".mkString(\",\")}]"
+        }
+        "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
+      }
 
-    val toStrWithoutOpts = {
-      val xs = func.args.collect {
-        case x: arg =>
+      val toStrDep = {
+        if (hasDep) """self.toString + "." + """
+        else ""
+      }
+
+      val toStrWithOpts = {
+        val xs = func.args.map { x =>
           val ccName = nameToCamelCase(x.name)
-          ccName + " = ${"+ccName+".toString}"
-        case x: multiarg =>
-          val ccName = nameToCamelCase(x.name)
-          ccName + " = [${"+ccName+".mkString(\",\")}]"
+          ccName + " = ${" + ccName + ".toString}"
+        }
+        "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
       }
-      "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
-    }
-
-    val toStrDep = {
-      if (hasDep) """self.toString + "." + """
-      else ""
-    }
-    
-    val toStrWithOpts = {
-      val xs = func.args.map { x =>
-        val ccName = nameToCamelCase(x.name)
-        ccName + " = ${"+ccName+".toString}"
+      val doc = {
+        val lines = module.doc.fold("") { s ⇒
+          s.split("\n").map("   * " + _).mkString("\n")
+        }
+        s"""
+           |  /**
+           |$lines
+           |   */
+         """.stripMargin
       }
-      "s\"" + funcName + "(" + xs.mkString(", ") + ")" + "\""
-    }
-
-    val doc = {
-      val lines = module.doc.fold("") { s ⇒
-        s.split("\n").map("   * " + _).mkString("\n")
+      val withOps = if (optsDef.nonEmpty) {
+        val optsDefStr = optsDef.mkString(", ")
+        s"""    def optargs($optsDefStr): $ret = new $ret {
+           |      val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
+           |      override def toString: String = $toStrDep$toStrWithOpts
+           |    }
+         """.stripMargin
+      } else {
+        ""
       }
-      s"""
-         |  /**
-         |$lines
-         |   */
-       """.stripMargin
-    }
-
-    val withoutOps = {
       val argsDefStr = {
         if (argsDef.isEmpty) ""
         else "(" + argsDef.mkString(", ") + ")"
       }
-      s"""  def $funcName$argsDefStr: $ret = new $ret {
-         |    // Without opts
-         |    val json = s\"\""[${module.termType},[$args]]\"\""
-         |    override def toString: String = $toStrDep$toStrWithoutOpts
-         |  }
-     """.stripMargin
-    }
-    val withOps = if (optsDef.nonEmpty) {
-      val argsDefStr = argsDef.foldLeft("")(_ + _ + ", ")
-      val optsDefStr = optsDef.mkString(", ")
-      s"""  def $funcName($argsDefStr$optsDefStr): $ret = new $ret {
-         |    // With opts
-         |    val json = s\"\""[${module.termType},[$args],{$opts}]\"\""
-         |    override def toString: String = $toStrDep$toStrWithOpts
-         |  }
+      s"""  $doc
+          |  def $funcName$argsDefStr: $complexRet = new $complexRet {
+          |    lazy val json = s\"\""[${module.termType},[$args]]\"\""
+          |    override def toString: String = $toStrDep$toStrWithoutOpts
+          |$withOps
+          |  }
        """.stripMargin
-    } else {
-      ""
+    }    
+  }
+
+  private[this] def genFuncResultTypes(module: module) = {
+    module.funcs.zipWithIndex map { case (func, i) ⇒
+      val complexRet = nameToCamelCase(module.name, isClass = true) + i
+      val ret = module.dataTypes.map(topToName).mkString(" with ")
+      val optsDef = func.args.collect {
+        case arg: opt ⇒
+          val name = nameToCamelCase(arg.name)
+          val tpe = topToName(arg.tpe)
+          s"$name: $tpe = EmptyOption"
+      }
+      if (optsDef.nonEmpty) {
+        s"""
+           |  trait $complexRet extends $ret {
+           |    def optargs(${optsDef.mkString(", ")}): $ret
+           |  }
+           |""".stripMargin
+      } else ""
     }
-    s"""$doc
-       |$withoutOps
-       |$withOps
-     """.stripMargin
   }
 
   private[this] def genOps() = {
@@ -169,13 +175,14 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
       val someTpe = Some(tpe)
       val tpeName = topToName(tpe)
       val className = tpeName + "Ops"
-      val funDefs = {
-        val xs = modules flatMap { module ⇒
-          module.funcs.
-            filter(fun ⇒ fun.dependency == someTpe).
-            map(genFunc(module, _, hasDep = true))
+      val (funTypes, funDefs) = {
+        val pureModules = modules map { module ⇒
+          val newFuncs = module.funcs.filter(fun ⇒ fun.dependency == someTpe)
+          module.copy(funcs = newFuncs)
         }
-        xs.mkString("\n")
+        val funTypes = pureModules.flatMap(genFuncResultTypes)
+        val funDefs = pureModules.flatMap(genFuncs(_, hasDep = true))
+        (funTypes.mkString("\n"), funDefs.mkString("\n"))
       }
       ReqlFile(className + ".scala",
         s"""
@@ -184,7 +191,12 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
            |import reql.dsl.types._
            |
            |// Generated code. Do not modify
+           |object $className {
+           |$funTypes
+           |}
+           |
            |final class $className(val self: $tpeName) extends AnyVal {
+           |import $className._
            |$funDefs
            |}
          """.stripMargin
@@ -216,13 +228,14 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
   }
 
   private[this] def genBaseOps() = {
-    val funDefs = {
-      val xs = modules flatMap { module ⇒
-        module.funcs.
-          filter(fun ⇒ fun.dependency.isEmpty).
-          map(genFunc(module, _, hasDep = false))
+    val (funTypes, funDefs) = {
+      val pureModules = modules map { module ⇒
+        val newFuncs = module.funcs.filter(fun ⇒ fun.dependency.isEmpty)
+        module.copy(funcs = newFuncs)
       }
-      xs.mkString("\n")
+      val funTypes = pureModules.flatMap(genFuncResultTypes)
+      val funDefs = pureModules.flatMap(genFuncs(_, hasDep = false))
+      (funTypes.mkString("\n"), funDefs.mkString("\n"))
     }
     ReqlFile("ReqlTopLevelApi.scala",
       s"""
@@ -230,8 +243,13 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
          |
          |import reql.dsl.types._
          |
+         |object ReqlTopLevelApi {
+         |$funTypes
+         |}
+         |
          |// Generated code. Do not modify|
          |class ReqlTopLevelApi {
+         |import ReqlTopLevelApi._
          |$funDefs
          |}
      """.stripMargin
