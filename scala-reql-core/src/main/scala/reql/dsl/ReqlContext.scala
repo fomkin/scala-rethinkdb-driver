@@ -91,6 +91,19 @@ object ReqlContext {
     def runC[U](f: Cursor[Data] ⇒ U)(implicit c: ReqlContext[Data]): Unit = {
       c.runCursorQuery(self)(f)
     }
+
+    def runC(implicit c: ReqlContext[Data]): Future[Seq[Data]] = {
+      val p = Promise[Seq[Data]]()
+      c.runCursorQuery(self) { cursor: Cursor[Data] ⇒
+        cursor force {
+          case Right(value) ⇒ p.success(value)
+          case Left(value) ⇒
+            val exception = ThrowableReqlQueryException(value, self)
+            p.failure(exception)
+        }
+      }
+      p.future
+    }
   }
 
 }

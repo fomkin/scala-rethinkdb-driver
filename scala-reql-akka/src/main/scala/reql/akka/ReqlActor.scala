@@ -92,7 +92,10 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     }
 
     def close(): Unit = {
-      if (!closed) dbConnection ! StopQuery(token)
+      if (!closed) {
+        closed = true
+        dbConnection ! StopQuery(token)
+      }
       else throw CursorException("Cursor already closed")
     }
 
@@ -173,7 +176,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
   @tailrec
   private[this] def appendSequenceToCursorAndClose(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
-    case Nil ⇒ // Do nothing
+    case Nil ⇒ cursor.close()
     case x :: Nil ⇒ cursor.append(x, close = true)
     case x :: xs ⇒
       cursor.append(x, close = false)

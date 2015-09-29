@@ -9,7 +9,7 @@ final class TableSpecialOps(val self: Table) extends AnyVal {
     (self.json :: keys.map(extractJson).toList).mkString(",")
   }
   
-  def getAll(index: Str)(keys: Datum*): Arr = new Arr {
+  def getAll(index: Str)(keys: Datum*): Arr with Table = new Arr with Table {
     override def toString = self.toString + ".getAll(index = " + index + ", " + keys.mkString(", ") + ")"
     val json = {
       val args = getArgs(keys)
@@ -17,7 +17,7 @@ final class TableSpecialOps(val self: Table) extends AnyVal {
     }
   }
 
-  def getAll(keys: Datum*): Arr = new Arr {
+  def getAll(keys: Datum*): Arr with Table = new Arr with Table {
     override def toString = self.toString + ".getAll(" + keys.mkString(", ") + ")"
     val json = {
       val args = getArgs(keys)

@@ -169,6 +169,7 @@ object ApiDefinitions {
         opt("geo", Top.Datum.Bool)
       ),
       fun(Top.Sequence.Table)(
+        arg("name", Top.Datum.Str),
         arg("f", Top.FunctionArg(1)),
         opt("multi", Top.Datum.Bool),
         opt("geo", Top.Datum.Bool)
