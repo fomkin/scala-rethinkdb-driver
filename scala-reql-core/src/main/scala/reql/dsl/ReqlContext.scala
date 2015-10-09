@@ -22,25 +22,6 @@ trait ReqlContext[Data] extends ReqlEntryPoint {
   //
   //---------------------------------------------------------------------------
 
-  sealed trait ParsedResponse
-
-  object ParsedResponse {
-
-    trait Error extends ParsedResponse {
-      def tpe: ReqlResponseWithError
-      def text: String
-    } 
-
-    trait Atom extends ParsedResponse {
-      def data: Data
-    }
-
-    trait Sequence extends ParsedResponse {
-      def xs: Seq[Data]
-      def partial: Boolean
-    }
-  }
-
   /**
    * Parse response. Implement this in parser.
    * @param data JSON part of response
@@ -64,6 +45,25 @@ trait ReqlContext[Data] extends ReqlEntryPoint {
 }
 
 object ReqlContext {
+
+  sealed trait ParsedResponse
+
+  object ParsedResponse {
+
+    trait Error extends ParsedResponse {
+      def tpe: ReqlResponseWithError
+      def text: String
+    }
+
+    trait Atom[Data] extends ParsedResponse {
+      def data: Data
+    }
+
+    trait Sequence[Data] extends ParsedResponse {
+      def xs: Seq[Data]
+      def partial: Boolean
+    }
+  }
 
   type AtomCb[Data] = Either[ReqlQueryException, Data] ⇒ _
 

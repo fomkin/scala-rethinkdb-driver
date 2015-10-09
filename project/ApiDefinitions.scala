@@ -242,11 +242,16 @@ object ApiDefinitions {
       fun(Top.Datum)(arg("i", Top.Datum.Num))
     ),
 
-    //LIMIT = 71; // Sequence, NUMBER -> Sequence
+    // LIMIT = 71; // Sequence, NUMBER -> Sequence
     module(termType = 71, name = "limit")(Top.Sequence)(
       fun(Top.Sequence)(arg("count", Top.Datum.Num))
     ),
   
+    // SKIP  = 70; // Sequence, NUMBER -> Sequence
+    module(termType = 70, name = "skip")(Top.Sequence)(
+      fun(Top.Sequence)(arg("count", Top.Datum.Num))
+    ),
+
     // Updates all the rows in a selection.  Calls its Function with the row
     // to be updated, and then merges the result of that call.
     // UPDATE   = 53; // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> 
@@ -291,6 +296,12 @@ object ApiDefinitions {
     )(Top.Datum.Obj)(
       fun(Top.Sequence.Table)(
         arg("data", Top.Datum.Obj),
+        opt("conflict", Top.Datum.Str),
+        opt("durability", Top.Datum.Str),
+        opt("return_changes", Top.Datum.Bool)
+      ),
+      fun(Top.Sequence.Table)(
+        arg("batch", Top.Sequence),
         opt("conflict", Top.Datum.Str),
         opt("durability", Top.Datum.Str),
         opt("return_changes", Top.Datum.Bool)
@@ -368,6 +379,12 @@ object ApiDefinitions {
       fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
     ),
 
+    // Deletes all the rows in a selection.
+    //DELETE   = 54; // StreamSelection, {durability:STRING, return_changes:BOOL} -> OBJECT | SingleSelection -> OBJECT
+    module(termType = 54, name = "delete")(Top.Datum.Obj)(
+      fun(Top.Sequence.StreamSelection)(opt("durability", Top.Datum.Str), opt("return_changes", Top.Datum.Bool))
+    ),
+  
     module(termType = 128, name = "year")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 129, name = "month")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 130, name = "day")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),

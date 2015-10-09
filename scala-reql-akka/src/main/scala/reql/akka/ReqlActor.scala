@@ -193,14 +193,14 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     message match {
       case ReqlTcpConnection.Response(token, rawData) ⇒
         parseResponse(rawData) match {
-          case pr: ParsedResponse.Atom ⇒
+          case pr: ParsedResponse.Atom[Data] ⇒
             atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
             dbConnection ! ForgetQuery(token)
-          case pr: ParsedResponse.Sequence if pr.partial ⇒
+          case pr: ParsedResponse.Sequence[Data] if pr.partial ⇒
             val cursor = activeCursors.getOrElseUpdate(
               token, registerCursorForPartialResponse(token))
             pr.xs.foreach(cursor.append(_, close = false))
-          case pr: ParsedResponse.Sequence if !pr.partial ⇒
+          case pr: ParsedResponse.Sequence[Data] if !pr.partial ⇒
             activeCursors.get(token) match {
               case Some(cursor) ⇒ appendSequenceToCursorAndClose(cursor, pr.xs.toList)
               case None ⇒ cursorCallbacks.get(token) foreach { cb ⇒

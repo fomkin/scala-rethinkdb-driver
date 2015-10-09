@@ -15,13 +15,14 @@ trait PushkaReqlContext extends ReqlContext[Ast] {
 
   import ReqlResponseType._
   import PushkaReqlContext._
+  import ReqlContext._
 
   @pushka
   case class PRes(t: Int, r: Ast)
 
-  case class Atom(data: Ast) extends ParsedResponse.Atom
+  case class Atom(data: Ast) extends ParsedResponse.Atom[Ast]
 
-  case class Sequence(xs: Seq[Ast], partial: Boolean) extends ParsedResponse.Sequence
+  case class Sequence(xs: Seq[Ast], partial: Boolean) extends ParsedResponse.Sequence[Ast]
 
   case class Error(tpe: ReqlResponseWithError, text: String) extends ParsedResponse.Error
   
