@@ -24,7 +24,7 @@ case class ThrowableReqlQueryException(value: ReqlQueryException,
                                        query: ReqlArg) 
   extends Throwable {
   
-  override def toString: String = s"$value in $query"
+  override def toString: String = s"$value in $query. JSON: ${query.json}"
 
   override def getMessage: String = toString
 }

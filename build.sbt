@@ -30,8 +30,8 @@ val `scala-reql-pushka` = crossProject.crossType(CrossType.Pure).
   settings(
     addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
   ).
-  jvmSettings(libraryDependencies += "com.github.fomkin" %% "pushka-json" % "0.2.0").
-  jsSettings(libraryDependencies += "com.github.fomkin" %%% "pushka-json" % "0.2.0")
+  jvmSettings(libraryDependencies += "com.github.fomkin" %% "pushka-json" % "0.3.0").
+  jsSettings(libraryDependencies += "com.github.fomkin" %%% "pushka-json" % "0.3.0")
 
 lazy val `scala-reql-pushka-js` = `scala-reql-pushka`.js
 lazy val `scala-reql-pushka-jvm` = `scala-reql-pushka`.jvm

@@ -176,6 +176,11 @@ object ApiDefinitions {
       )
     ),
 
+    // INDEX_WAIT = 140; // Table, STRING... -> ARRAY
+    module(termType = 140, name = "indexWait")(Top.Datum.Arr)(
+      fun(Top.Sequence.Table)(multiarg("indexies", Top.Datum.Str))
+    ),
+
     // Gets a single element from a table by its primary or a secondary key.
     // Table, STRING -> SingleSelection | Table, NUMBER -> SingleSelection |
     // Table, STRING -> NULL            | Table, NUMBER -> NULL |
@@ -197,6 +202,15 @@ object ApiDefinitions {
     module(termType = 31, name = "getField")(Top.AnyType)(
       fun(Top.Datum.Obj)(arg("field_name", Top.Datum.Str))
     ),
+
+    // Check whether an object contains all the specified fields,
+    // or filters a sequence so that all objects inside of it
+    // contain all the specified fields.
+    //HAS_FIELDS = 32; // OBJECT, Pathspec... -> BOOL
+    module(termType = 32, name = "hasFields")(Top.Datum.Bool)(
+      fun(Top.Datum.Obj)(multiarg("fields", Top.Datum.Str))
+    ),
+
 
     //PLUCK    = 33; // Sequence, Pathspec... -> Sequence | OBJECT, Pathspec... -> OBJECT
     module(termType = 33, name = "pluck")(Top.AnyType)(
