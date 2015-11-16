@@ -101,7 +101,9 @@ class ReqlTcpConnection(remote: InetSocketAddress, authKey: Option[String])
       for ((token, (receiver)) ← queries) {
         receiver ! ConnectionClosed
       }
-      establishConnection()
+      context.system.scheduler.scheduleOnce(ReconnectInterval) {
+        establishConnection()
+      }
       context.unbecome()
   }
 

@@ -181,6 +181,14 @@ object ApiDefinitions {
       fun(Top.Sequence.Table)(multiarg("indexies", Top.Datum.Str))
     ),
 
+    module(termType = 77, name = "indexList")(Top.Datum.Arr)(
+      fun(Top.Sequence.Table)()
+    ),
+
+    module(termType = 62, name = "tableList")(Top.Datum.Arr)(
+      fun(Top.Database)()
+    ),
+
     // Gets a single element from a table by its primary or a secondary key.
     // Table, STRING -> SingleSelection | Table, NUMBER -> SingleSelection |
     // Table, STRING -> NULL            | Table, NUMBER -> NULL |
@@ -396,7 +404,8 @@ object ApiDefinitions {
     // Deletes all the rows in a selection.
     //DELETE   = 54; // StreamSelection, {durability:STRING, return_changes:BOOL} -> OBJECT | SingleSelection -> OBJECT
     module(termType = 54, name = "delete")(Top.Datum.Obj)(
-      fun(Top.Sequence.StreamSelection)(opt("durability", Top.Datum.Str), opt("return_changes", Top.Datum.Bool))
+      fun(Top.Sequence.StreamSelection)(opt("durability", Top.Datum.Str), opt("return_changes", Top.Datum.Bool)),
+      fun(Top.Datum.SingleSelection)()
     ),
   
     module(termType = 128, name = "year")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
