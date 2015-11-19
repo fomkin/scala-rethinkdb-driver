@@ -1,5 +1,4 @@
 package reql.akka
-
 import akka.actor.{Actor, ActorRef}
 import akka.util.Timeout
 import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
@@ -72,6 +71,8 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     var data = List.empty[Data]
 
     var closed = false
+
+
 
     def next[U](f: Either[ReqlQueryException, Data] ⇒ U): Unit = {
       checkFail(whenFail = e ⇒ f(Left(e))) {

@@ -86,6 +86,10 @@ object module {
   def apply(name: String, termType: Int, doc: String)(dataTypes: Top*)(funcs: fun*): module = {
     module(termType, dataTypes, name, funcs, Some(doc))
   }
+
+  def createModule(name: String, id: Int, dataTypes: Seq[Top], funcs: Seq[fun]): module = {
+    module(id, dataTypes, name, funcs, Option[String](""))
+  }
 }
 
 case class fun(customName: Option[String], dependency: Option[Top], args: Seq[ArgOrOpt])
@@ -105,6 +109,10 @@ object fun {
   }
 
   def apply(args: ArgOrOpt*): fun = fun(None, None, args)
+
+  def createFun(dependency: Top, args: Seq[ArgOrOpt]): fun = {
+    fun(None, Some(dependency), args)
+  }
 }
 
 sealed trait ArgOrOpt {

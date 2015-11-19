@@ -1,0 +1,16 @@
+2015-11-18T20:33:06.981222000 0.502685s notice: Recursively removing directory /Users/Mihail/Desktop/githubRepos/my/scala-reql/rethinkdb_data/tmp
+2015-11-18T20:33:06.984790000 0.506263s notice: Initializing directory /Users/Mihail/Desktop/githubRepos/my/scala-reql/rethinkdb_data
+2015-11-18T20:33:06.984916000 0.506377s info: Creating a default database for your convenience. (This is because you ran 'rethinkdb' without 'create', 'serve', or '--join', and the directory '/Users/Mihail/Desktop/githubRepos/my/scala-reql/rethinkdb_data' did not already exist or is empty.)
+2015-11-18T20:33:06.986005000 0.507467s notice: Running rethinkdb 2.1.5-2 (CLANG 7.0.0 (clang-700.0.72))...
+2015-11-18T20:33:07.000560000 0.522023s notice: Running on Darwin 14.5.0 x86_64
+2015-11-18T20:33:07.000622000 0.522083s notice: Loading data from directory /Users/Mihail/Desktop/githubRepos/my/scala-reql/rethinkdb_data
+2015-11-18T20:33:07.132086000 0.653547s info: Automatically using cache size of 100 MB
+2015-11-18T20:33:07.132098000 0.653558s warn: Cache size does not leave much memory for server and query overhead (available memory: 880 MB).
+2015-11-18T20:33:07.132104000 0.653565s warn: Cache size is very low and may impact performance.
+2015-11-18T20:33:07.132649000 0.654110s notice: Listening for intracluster connections on port 29015
+2015-11-18T20:33:07.139365000 0.660826s notice: Listening for client driver connections on port 28015
+2015-11-18T20:33:07.139599000 0.661060s notice: Listening for administrative HTTP connections on port 8080
+2015-11-18T20:33:07.139608000 0.661068s notice: Listening on addresses: 127.0.0.1, ::1
+2015-11-18T20:33:07.139609000 0.661070s notice: To fully expose RethinkDB on the network, bind to all addresses by running rethinkdb with the `--bind all` command line option.
+2015-11-18T20:33:07.139613000 0.661074s notice: Server ready, "Air_Mihail_cqu" 5bee8b40-18f5-496f-8aa4-58c18628d255
+2015-11-18T20:33:09.096876000 2.618265s notice: A newer version of the RethinkDB server is available: 2.2.1. You can read the changelog at <https://github.com/rethinkdb/rethinkdb/releases>.

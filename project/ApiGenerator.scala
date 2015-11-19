@@ -266,6 +266,7 @@ class ApiGenerator(modules: Seq[module]) extends (File ⇒ Seq[File]) {
   }
 }
 
-object ApiGenerator extends ApiGenerator(ApiDefinitions.modules)
+object ApiGenerator extends ApiGenerator(ApiDefinitionsGenerator.getModules())
+//object ApiGenerator extends ApiGenerator(ApiDefinitions.modules)
 
 case class ReqlFile(name: String, content: String)

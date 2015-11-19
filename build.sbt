@@ -17,6 +17,8 @@ val commonSettings = Seq(
   }
 )
 
+val lift_json = "net.liftweb" %% "lift-json" % "2.3"
+
 val `scala-reql-core` = crossProject.crossType(CrossType.Pure).
   settings(commonSettings:_*).
   settings(sourceGenerators in Compile <+= sourceManaged in Compile map ApiGenerator)
