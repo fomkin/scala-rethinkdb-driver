@@ -3,7 +3,6 @@ import sbt.MainLogging
 import scala.collection.mutable
 import scala.util.parsing.json.JSON
 import scala.io.Source
-
 object ApiDefinitionsGenerator {
 
   def getModules(): Seq[module] = {
@@ -19,7 +18,7 @@ object ApiDefinitionsGenerator {
 
     json match {
       case Some(map: Map[String, Any]) =>
-        val math = Array[String]("EQ", "NE", "LT", "GT", "BRANCH", "OR", "AND", "ADD", "SUB")
+        val math = Array[String]("EQ", "NE", "LT", "GT", "BRANCH", "OR", "AND", "ADD", "SUB", "MATCH", "OBJECT")
         for(key <- map.keys) {
           if (!math.contains(key)) {
             modules = genModule(map.get(key), key) :: modules
@@ -30,16 +29,6 @@ object ApiDefinitionsGenerator {
 
     modules = modules ::: ApiDefinitions.modules.toList
     println(modules.length)
-
-    var set = mutable.Set[Int]()
-    for (m <- modules) {
-      set.add(m.termType)
-      println("moduleName" + m.name)
-      println(m.funcs)
-      println(m.dataTypes)
-      println()
-    }
-    println("setCount:" + set.count(p => true))
     return modules
   }
 
@@ -52,14 +41,13 @@ object ApiDefinitionsGenerator {
             0
         }
 
-        var topTypes = genTopTypes(dictMap.get("include_in"))
-
-        //if (topTypes.length > 1)  topTypes = List[Top](Top.AnyType)
+        val includeInTypes = genTopTypes(dictMap.get("include_in"))
 
         val optArgs = genOptArgs(dictMap.get("optargs"))
 
-        val functions = genFunctions(dictMap.get("signatures"), optArgs, id)
-        module.createModule(name.toLowerCase, id, topTypes, functions)
+        val functions = genFunctions(dictMap.get("signatures"), optArgs, includeInTypes)
+
+        module(name.toLowerCase, id)(nameToType(name))(functions:_*)
       case _ => throw new JsonParseException
     }
   }
@@ -81,49 +69,58 @@ object ApiDefinitionsGenerator {
         // todo: handle complex optargs
         for ((name, argType) <- map) {
           argType match {
-            case Some(s: String) => result = opt(name, strToTopType(s)) :: result
-            case _ => println("Complex optarg: " + argType)
+            case s: String =>
+              result = opt(name, strToTopType(s)) :: result
+            case _ =>
+              println("Complex optarg: " + argType)
           }
         }
         return result
       case None => List[ArgOrOpt]()
       case _ => throw new JsonParseException
     }
-
   }
 
-  def genFunctions(signaturesAny: Any, optArgs: List[ArgOrOpt], id: Int): List[fun] = {
+  def genFunctions(signaturesAny: Any, optArgs: List[ArgOrOpt], includeInTypes: List[Top]): List[fun] = {
 
     signaturesAny match {
       case Some(signatures: List[List[Any]]) =>
         var functions = List[fun]()
         for (signature <- signatures) {
-          if (!signature.contains("T_FUNC1") && !signature.contains("T_FUNC0") && !signature.contains("T_FUNC2")) {
+          if (!signature.contains("T_FUNC0") && !signature.contains("T_FUNC1") && !signature.contains("T_FUNC2") && !signature.contains("T_FUNCX")) {
             if (signature.isEmpty) {
               functions = fun() :: functions
             }
             else {
               var args = List[ArgOrOpt]()
-              for (i <- 1 until signature.length)
+
+              for (i <- 0 until signature.length)
                 signature(i) match {
                   case "*" => args = multiarg("x", strToTopType("*")) :: args
                   case argType: String => args = arg("arg" + i.toString, strToTopType(argType)) :: args
                   case _ => println("NON string arg:" + signature(i))
                 }
-              signature.head match {
-                case s: String =>
-                  functions = fun.createFun(strToTopType(s), (optArgs ::: args).reverse) :: functions
-                case _ => println("non string arg:" + signature(0))
+
+              val resultArgs = (optArgs ::: args).reverse
+              if (includeInTypes.contains(resultArgs.head.tpe)) {
+                functions = fun(resultArgs.head.tpe)(resultArgs.drop(1):_*) :: functions
+              }
+              else {
+                functions = fun(resultArgs:_*) :: functions
               }
             }
           }
         }
-        if (id == 14) {
-          functions = List[fun](fun(arg("name", Top.Datum.Str)))
-        }
         functions
       case None => List[fun]()
       case _ => throw new JsonParseException
+    }
+  }
+  def nameToType(name: String): Top = {
+    name match {
+      case "DB" => Top.Database
+      case "TABLE" => Top.Sequence.Table
+      case _ => Top.AnyType
     }
   }
   def strToTopType(str: String): Top = {

@@ -2,7 +2,7 @@ package reql.protocol
 
 sealed abstract class ReqlProtocol(val value: Int)
 
-//q6
+//q9
 object ReqlProtocol {
 
   case object ProtoBuf extends ReqlProtocol(656407617)

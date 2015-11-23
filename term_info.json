@@ -77,7 +77,7 @@
         "signatures": [[]],
         "id": 13
     },
-    "DB1": {
+    "DB": {
         "include_in": [
             "T_TOP_LEVEL"
         ],

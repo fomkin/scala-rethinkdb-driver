@@ -1,4 +1,3 @@
-
 sealed trait Top
 
 object Top extends Top {
@@ -11,9 +10,10 @@ object Top extends Top {
     Top.Sequence.Table, Top.PseudoType.Time, Top.PseudoType.Binary
   )
 
-  case object AnyType extends Top
-  
-  sealed trait Datum extends Top
+  sealed trait AnyType extends Top
+  object AnyType extends AnyType
+
+  sealed trait Datum extends AnyType
 
   sealed trait Sequence extends Top
 
@@ -24,14 +24,14 @@ object Top extends Top {
   case class FunctionArg(argsCount: Int) extends Top
 
   case object Function extends Top
-  
+
   case object Ordering extends Top
 
   case object Pathspec extends Top
 
   case object Error extends Top
 
-  object Datum extends Top {
+  object Datum extends Datum {
 
     case object Null extends Datum
 
@@ -86,10 +86,6 @@ object module {
   def apply(name: String, termType: Int, doc: String)(dataTypes: Top*)(funcs: fun*): module = {
     module(termType, dataTypes, name, funcs, Some(doc))
   }
-
-  def createModule(name: String, id: Int, dataTypes: Seq[Top], funcs: Seq[fun]): module = {
-    module(id, dataTypes, name, funcs, Option[String](""))
-  }
 }
 
 case class fun(customName: Option[String], dependency: Option[Top], args: Seq[ArgOrOpt])
@@ -109,10 +105,6 @@ object fun {
   }
 
   def apply(args: ArgOrOpt*): fun = fun(None, None, args)
-
-  def createFun(dependency: Top, args: Seq[ArgOrOpt]): fun = {
-    fun(None, Some(dependency), args)
-  }
 }
 
 sealed trait ArgOrOpt {
@@ -120,7 +112,7 @@ sealed trait ArgOrOpt {
   val name: String
 
   val tpe: Top
-  
+
   def isMulti = false
 }
 
