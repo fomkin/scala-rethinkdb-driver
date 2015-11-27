@@ -1,3 +1,4 @@
+import scala.annotation.tailrec
 import scala.io.Source
 import spray.json._
 import DefaultJsonProtocol._
@@ -83,28 +84,32 @@ object ApiDefinitionsGenerator {
     signatures collect {
       case emptySignature if emptySignature.isEmpty => fun()
       case signature =>
-        var argCount = -1
-        val args = signature collect {
-          case argTypeJs: JsString =>
+        @tailrec
+        def genArgs(acc: List[ArgOrOpt], argNumber: Int, tl: List[JsValue]): List[ArgOrOpt] = tl match {
+          case Nil => acc
+          case (argTypeJs: JsString) :: tale =>
             val argType = argTypeJs.convertTo[String]
-            argType match {
+            val argument = argType match {
               case "*" =>
                 multiarg("x", strToTopType("*"))
               case _ =>
-                argCount += 1
-                arg("arg" + argCount, strToTopType(argType))
+                arg("arg" + argNumber, strToTopType(argType))
             }
-          case _ => arg("func", Top.AnyType)
+
+            genArgs(argument.asInstanceOf[ArgOrOpt] :: acc, argNumber + 1, tale)
+          case _ :: tale =>
+            genArgs(arg("func" + argNumber, Top.AnyType) :: acc, argNumber + 1, tale)
         }
+
+        val args = genArgs(Nil, 0, signature).reverse
         val argsOrOpts = (args.toSeq ++ optArgs).asInstanceOf[Seq[ArgOrOpt]]
 
         if (includeInTypes.contains(argsOrOpts.head)) {
           val tpe = argsOrOpts.head.tpe
           fun(tpe)(argsOrOpts diff List(0): _*)
         }
-        else {
-          fun(argsOrOpts: _*)
-        }
+        else fun(argsOrOpts: _*)
+
     }
   }
 
@@ -128,9 +133,8 @@ object ApiDefinitionsGenerator {
     case "T_FUNC1" => Top.FunctionArg(1)
     case "T_FUNC2" => Top.FunctionArg(2)
     case "T_FUNC0" => Top.FunctionArg(0)
-    case "T_FUNCX" =>
-      // todo: implement functions type with unknown arguments count
-      Top.AnyType
+    // todo: implement functions type with unknown arguments count
+    case "T_FUNCX" => Top.AnyType
     case "*" => Top.Datum
     case "E_RESULT_FORMAT" => Top.Datum.Str
     case "E_HTTP_METHOD" => Top.Datum.Str
