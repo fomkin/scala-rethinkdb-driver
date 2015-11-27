@@ -1,0 +1,3 @@
+[submodule "rdb"]
+	path = rdb
+	url = git://github.com/rethinkdb/rethinkdb

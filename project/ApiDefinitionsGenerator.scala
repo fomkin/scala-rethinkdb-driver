@@ -7,7 +7,7 @@ object ApiDefinitionsGenerator {
 
   def modules(): Seq[module] = {
     //todo: read term_info.json from java driver
-    val jsonFilename = "term_info.json"
+    val jsonFilename = "rdb//drivers//java//term_info.json"
 
     val jsonStr = Source.fromFile(jsonFilename).mkString
     val jsonAst = jsonStr.parseJson
