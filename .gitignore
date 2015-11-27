@@ -6,4 +6,4 @@ target/
 .project
 .settings/
 *.iml
-
+rethinkdb_data/log_file

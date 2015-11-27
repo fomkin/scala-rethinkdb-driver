@@ -335,13 +335,7 @@
         "signatures": [["T_EXPR"]],
         "id": 94
     },
-    "OBJECT": {
-        "include_in": [
-            "T_TOP_LEVEL"
-        ],
-        "signatures": [["T_EXPR", "*"]],
-        "id": 143
-    },
+
     "HAS_FIELDS": {
         "include_in": ["T_EXPR"],
         "signatures": [["T_EXPR", "T_EXPR", "*"]],
@@ -856,11 +850,7 @@
         ],
         "id": 79
     },
-    "MATCH": {
-        "include_in": ["T_EXPR"],
-        "signatures": [["T_EXPR", "T_EXPR"]],
-        "id": 97
-    },
+
     "UPCASE": {
         "include_in": ["T_EXPR"],
         "signatures": [["T_EXPR"]],

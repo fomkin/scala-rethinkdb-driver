@@ -21,9 +21,9 @@ object Top extends Top {
 
   case object Database extends Top
 
-  case class FunctionArg(argsCount: Int) extends Top
+  case class FunctionArg(argsCount: Int) extends AnyType
 
-  case object Function extends Top
+  case object Function extends AnyType
 
   case object Ordering extends Top
 

@@ -1,132 +1,113 @@
-
-import scala.collection.mutable.ArrayBuffer
-import scala.util.parsing.json.JSON
 import scala.io.Source
+import spray.json._
+import DefaultJsonProtocol._
+
 object ApiDefinitionsGenerator {
 
   def modules(): Seq[module] = {
     //todo: read term_info.json from java driver
     val jsonFilename = "term_info.json"
-    var modules = ArrayBuffer[module]()
 
-    var jsonString = ""
-    for (line <- Source.fromFile(jsonFilename).getLines()) {
-      jsonString += line
-    }
-
-    val json = JSON.parseFull(jsonString)
-
-    json match {
-      case Some(map: Map[String, Any]) =>
-        // todo: implement math operations
-        val math = Array[String]("EQ", "NE", "LT", "GT", "BRANCH", "OR", "AND", "ADD", "SUB", "MATCH", "OBJECT")
-        for(key <- map.keys) {
-          if (!math.contains(key)) {
-            modules += genModule(map.get(key), key)
-          }
+    val jsonStr = Source.fromFile(jsonFilename).mkString
+    val jsonAst = jsonStr.parseJson
+    val map = jsonAst.convertTo[Map[String, JsValue]]
+    val modules = map.keys collect {
+      case mathKey @ ("EQ" | "NE" | "LT" | "GT" |
+                  "BRANCH" | "OR" | "AND" |
+                  "ADD" | "SUB") =>
+        mathModules.get(mathKey) match {
+          case Some(m: module) => m
         }
-      case _ => println("ERROR in json parse")
+      case key =>
+        genModule(key, map.get(key))
     }
-
-    modules.append(ApiDefinitions.modules:_*)
-    println(modules.length)
-    modules
+    modules.toSeq
   }
 
-  def genModule(moduleAny: Any, name: String): module = {
-    moduleAny match {
-      case Some(dictMap: Map[String, Any]) =>
-        val id = dictMap.get("id") match {
-          case Some(i: Double) => i.toInt
-          case _ => println("error")
-            0
+  def genModule(name: String, moduleValue: Option[JsValue]): module = {
+    moduleValue match {
+      case Some(m: JsValue) =>
+        val moduleMap = m.convertTo[Map[String, JsValue]]
+        val id = moduleMap.get("id") match {
+          case Some(jsObj: JsValue) => jsObj.convertTo[Double].toInt
+          case None => throw JsonParseException()
         }
-
-        val includeInTypes = genTopTypes(dictMap.get("include_in"))
-
-        val optArgs = genOptArgs(dictMap.get("optargs"))
-
-        val functions = genFunctions(dictMap.get("signatures"), optArgs, includeInTypes)
-
+        val includeInTypes = genTopTypes(moduleMap.getOrElse("include_in", JsObject()))
+        val optArgs = if (moduleMap.contains("optargs")) {
+          genOptArgs(moduleMap.getOrElse("optargs", JsObject()))
+        }
+        else {
+          List[ArgOrOpt]()
+        }
+        val signatures = moduleMap.getOrElse("signatures", JsObject())
+        val functions = if (moduleMap.contains("signatures")) {
+          genFunctions(signatures, optArgs, includeInTypes)
+        }
+        else {
+          List[fun]()
+        }
         module(name.toLowerCase, id)(nameToType(name))(functions:_*)
-      case _ => throw new JsonParseException
-    }
-  }
-  def genTopTypes(includeIn: Any): ArrayBuffer[Top] = {
-    includeIn match {
-      case Some(tops: List[String]) =>
-        var result = ArrayBuffer[Top]()
-        tops.foreach(t => result += strToTopType(t))
-        result
-      case _ => throw new JsonParseException
+      case None => throw JsonParseException()
     }
   }
 
-  def genOptArgs(optArgs: Any): ArrayBuffer[ArgOrOpt] = {
-    optArgs match {
-      case Some(map: Map[String, Any]) =>
-        var result = ArrayBuffer[ArgOrOpt]()
+  def genTopTypes(includeIn: JsValue): List[Top] = {
+    includeIn.convertTo[List[String]] collect {
+      case topTypeStr: String => strToTopType(topTypeStr)
+    }
+  }
 
+  def genOptArgs(optArgs: JsValue): List[ArgOrOpt] = {
+    val map = optArgs.convertTo[Map[String, JsValue]]
+    val result = map.keys collect {
+      case name =>
         // todo: handle complex optargs
-        for ((name, argType) <- map) {
-          argType match {
-            case s: String =>
-              result += opt(name, strToTopType(s))
-            case _ =>
-              println("Complex optarg: " + argType)
-          }
+        val argType = try {
+          map(name).convertTo[String]
         }
-        result
-      case None => ArrayBuffer[ArgOrOpt]()
-      case _ => throw new JsonParseException
+        catch {
+          case e: Exception =>
+            println("Complex optArg type: " + map(name))
+            "T_EXPR"
+        }
+        opt(name, strToTopType(argType))
+    }
+    result.toList
+  }
+
+  def genFunctions(signaturesJson: JsValue,
+                   optArgs: List[ArgOrOpt],
+                   includeInTypes: List[Top]): List[fun] = {
+    val signatures = signaturesJson.convertTo[List[List[JsValue]]]
+
+    signatures collect {
+      case emptySignature if emptySignature.isEmpty => fun()
+      case signature =>
+        var argCount = -1
+        val args = signature collect {
+          case argTypeJs: JsString =>
+            val argType = argTypeJs.convertTo[String]
+            argType match {
+              case "*" =>
+                multiarg("x", strToTopType("*"))
+              case _ =>
+                argCount += 1
+                arg("arg" + argCount, strToTopType(argType))
+            }
+          case _ => arg("func", Top.AnyType)
+        }
+        val argsOrOpts = (args.toSeq ++ optArgs).asInstanceOf[Seq[ArgOrOpt]]
+
+        if (includeInTypes.contains(argsOrOpts.head)) {
+          val tpe = argsOrOpts.head.tpe
+          fun(tpe)(argsOrOpts diff List(0): _*)
+        }
+        else {
+          fun(argsOrOpts: _*)
+        }
     }
   }
 
-  def genFunctions(signaturesAny: Any,
-                   optArgs: ArrayBuffer[ArgOrOpt],
-                   includeInTypes: ArrayBuffer[Top]): ArrayBuffer[fun] = {
-
-    signaturesAny match {
-      case Some(signatures: List[List[Any]]) =>
-        var functions = ArrayBuffer[fun]()
-        for (signature <- signatures) {
-          //todo: implement signatures with function type
-          if (!signature.contains("T_FUNC0") && !signature.contains("T_FUNC1") && !signature.contains("T_FUNC2") && !signature.contains("T_FUNCX")) {
-            if (signature.isEmpty) {
-              functions += fun()
-            }
-            else {
-              var args = ArrayBuffer[ArgOrOpt]()
-
-              var argCount = 0
-              for (argType <- signature)
-                argType match {
-                  case "*" =>
-                    args += multiarg("x", strToTopType("*"))
-                  case argType: String =>
-                    args += arg("arg" + argCount, strToTopType(argType))
-                    argCount += 1
-                  case _ => println("NON string arg:" + argType)
-                }
-
-              args.append(optArgs: _*)
-
-              if (includeInTypes.contains(args.head.tpe)) {
-                val tpe = args.head.tpe
-                args.remove(0)
-                functions += fun(tpe)(args:_*)
-              }
-              else {
-                functions += fun(args:_*)
-              }
-            }
-          }
-        }
-        functions
-      case None => ArrayBuffer[fun]()
-      case _ => throw new JsonParseException
-    }
-  }
   def nameToType(name: String): Top = {
     name match {
       case "DB" => Top.Database
@@ -149,15 +130,95 @@ object ApiDefinitionsGenerator {
     case "T_FUNC0" => Top.FunctionArg(0)
     case "T_FUNCX" =>
       // todo: implement functions type with unknown arguments count
-      Top.FunctionArg(0)
+      Top.AnyType
     case "*" => Top.Datum
     case "E_RESULT_FORMAT" => Top.Datum.Str
     case "E_HTTP_METHOD" => Top.Datum.Str
-
-
     case _ =>
       println("Unknown include_in type: " + str)
       Top.AnyType
+  }
+
+  // todo: implement math operations
+  def mathModules = {
+     Map[String, module](
+      //-------------------------------------------------------------------------
+      //
+      //  Math
+      //
+      //-------------------------------------------------------------------------
+      "EQ" ->
+      // EQ  = 17; // DATUM... -> BOOL
+      module(termType = 17, name = "eq")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+        fun(Top.Datum)(arg("and", Top.Datum)),
+        fun("===", Top.Datum)(arg("and", Top.Datum))
+      ),
+      "NE" ->
+      // NE  = 18; // DATUM... -> BOOL
+      module(termType = 18, name = "ne")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+        fun(Top.Datum)(arg("and", Top.Datum)),
+        fun("!===", Top.Datum)(arg("and", Top.Datum))
+      ),
+
+     "LT" ->
+      //LT  = 19; // DATUM... -> BOOL
+      module(termType = 19, name = "lt")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+        fun(Top.Datum)(arg("thn", Top.Datum)),
+        fun("<", Top.Datum)(arg("thn", Top.Datum))
+      ),
+
+     "GT" ->
+      //GT  = 21; // DATUM... -> BOOL
+      module(termType = 21, name = "gt")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum), arg("b", Top.Datum)),
+        fun(Top.Datum)(arg("thn", Top.Datum)),
+        fun(">", Top.Datum)(arg("thn", Top.Datum))
+      ),
+
+     "BRANCH" ->
+      // Executes its first argument, and returns its second argument if it
+      // got [true] or its third argument if it got [false] (like an `if`
+      // statement).
+      //BRANCH  = 65; // BOOL, Top, Top -> Top
+      module(termType = 65, name = "branch")(Top.AnyType)(
+        fun(arg("condition", Top.Datum.Bool), arg("thn", Top), arg("els", Top))
+      ),
+
+     "OR" ->
+      //OR = 66; // BOOL... -> BOOL
+      module(termType = 66, name = "or")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum.Bool), arg("b", Top.Datum.Bool)),
+        fun(Top.Datum.Bool)(arg("b", Top.Datum.Bool)),
+        fun("||", Top.Datum)(arg("b", Top.Datum))
+      ),
+
+     "AND" ->
+      //  AND     = 67; // BOOL... -> BOOL
+      module(termType = 67, name = "and")(Top.Datum.Bool)(
+        fun(arg("a", Top.Datum.Bool), arg("b", Top.Datum.Bool)),
+        fun(Top.Datum.Bool)(arg("b", Top.Datum.Bool)),
+        fun("&&", Top.Datum)(arg("b", Top.Datum))
+      ),
+
+     "ADD" ->
+      // SUB = 25; // NUMBER... -> NUMBER
+      module(termType = 24, name = "add")(Top.Datum.Num)(
+        fun(multiarg("values", Top.Datum.Num)),
+        fun(Top.Datum.Num)(arg("value", Top.Datum.Num)),
+        fun("+", Top.Datum.Num)(arg("value", Top.Datum.Num))
+      ),
+
+     "SUB" ->
+      // SUB = 25; // NUMBER... -> NUMBER
+      module(termType = 25, name = "sub")(Top.Datum.Num)(
+        fun(multiarg("values", Top.Datum.Num)),
+        fun(Top.Datum.Num)(arg("value", Top.Datum.Num)),
+        fun("-", Top.Datum.Num)(arg("value", Top.Datum.Num))
+      )
+    )
   }
 }
 
