@@ -9,7 +9,7 @@ object ApiDefinitions {
   }
 
   val modules = Seq(
-  
+
     module(termType = 169, name = "uuid")(Top.Datum)(fun()),
     module(termType = 13, name = "implicitVar")(Top.Datum)(fun()),
     // TODO hadcode it
@@ -32,7 +32,7 @@ object ApiDefinitions {
       //         auth: OBJECT,
       //         result_format: STRING,
       //         } -> STRING | STREAM
-      
+
     //-------------------------------------------------------------------------
     //
     //  Math
@@ -105,7 +105,7 @@ object ApiDefinitions {
     module(termType = 57, name = "dbCreate")(Top.Datum.Obj)(
       fun(arg("name", Top.Datum.Str))
     ),
-  
+
     // DB_LIST       = 59; // -> ARRAY
     module(termType = 59, name = "dbList")(Top.Datum.Arr)(fun()),
 
@@ -148,7 +148,7 @@ object ApiDefinitions {
                           // Database, STRING, {primary_key:STRING, shards:NUMBER, replicas:OBJECT, primary_replica_tag:STRING} -> OBJECT
                           // STRING, {primary_key:STRING, shards:NUMBER, replicas:NUMBER, primary_replica_tag:STRING} -> OBJECT
                           // STRING, {primary_key:STRING, shards:NUMBER, replicas:OBJECT, primary_replica_tag:STRING} -> OBJECT
-    
+
      */
     module(termType = 60, name = "tableCreate")(Top.Datum.Obj)(
       fun(Top.Database)(
@@ -160,7 +160,7 @@ object ApiDefinitions {
       )
     ),
 
-    // INDEX_CREATE = 75; 
+    // INDEX_CREATE = 75;
     // Table, STRING, Function(1), {multi:BOOL} -> OBJECT
     module(termType = 75, name = "indexCreate")(Top.Datum.Obj)(
       fun(Top.Sequence.Table)(
@@ -199,12 +199,12 @@ object ApiDefinitions {
 //    module(termType = 78, name = "getAll")(Top.Datum.Arr)(
 //      fun(Top.Sequence.Table)(multiarg("keys", Top.Datum), opt("index", Top.Datum.Str))
 //    ),
-    
+
     // Sequence -> BOOL
     module(termType = 86, name = "isEmpty")(Top.Datum.Bool)(
       fun(Top.Sequence)()
     ),
-  
+
     // GET_FIELD  = 31; // OBJECT, STRING -> DATUM
     // | Sequence, STRING -> Sequence
     module(termType = 31, name = "getField")(Top.AnyType)(
@@ -268,7 +268,7 @@ object ApiDefinitions {
     module(termType = 71, name = "limit")(Top.Sequence)(
       fun(Top.Sequence)(arg("count", Top.Datum.Num))
     ),
-  
+
     // SKIP  = 70; // Sequence, NUMBER -> Sequence
     module(termType = 70, name = "skip")(Top.Sequence)(
       fun(Top.Sequence)(arg("count", Top.Datum.Num))
@@ -276,7 +276,7 @@ object ApiDefinitions {
 
     // Updates all the rows in a selection.  Calls its Function with the row
     // to be updated, and then merges the result of that call.
-    // UPDATE   = 53; // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> 
+    // UPDATE   = 53; // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} ->
     // OBJECT |
     // SingleSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT |
     // StreamSelection, OBJECT,      {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT |
@@ -352,7 +352,7 @@ object ApiDefinitions {
     )(Top.Datum.Num)(
       fun(Top.PseudoType.Time)()
     ),
-      
+
     module(termType = 103, name = "now")(Top.PseudoType.Time)(fun()),
     module(termType = 104, name = "inTimezone", doc =
       """
@@ -384,7 +384,7 @@ object ApiDefinitions {
       """.stripMargin)(Top.Datum.Str)(
         fun(Top.PseudoType.Time)()
       ),
-  
+
     // Append a single element to the end of an array (like `snoc`).
 //    APPEND = 29; // ARRAY, DATUM -> ARRAY
   // Prepend a single element to the end of an array (like `cons`).
@@ -407,7 +407,7 @@ object ApiDefinitions {
       fun(Top.Sequence.StreamSelection)(opt("durability", Top.Datum.Str), opt("return_changes", Top.Datum.Bool)),
       fun(Top.Datum.SingleSelection)()
     ),
-  
+
     module(termType = 128, name = "year")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 129, name = "month")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
     module(termType = 130, name = "day")(Top.Datum.Num)(fun(Top.PseudoType.Time)()),
@@ -467,6 +467,11 @@ object ApiDefinitions {
       ),
       module(termType = 74, name = "desc")(Top.Ordering)(
         fun(arg("field", Top.Datum.Str))
+      ),
+
+      //DEFAULT = 92; // Top, Top -> Top
+      module(termType = 92, name = "default")(Top.AnyType)(
+        fun(Top.Datum)(arg("value", Top))
       )
 
     /*
