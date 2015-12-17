@@ -222,6 +222,11 @@ object ApiDefinitions {
       fun(Top.Datum.Obj)(multiarg("fields", Top.Datum.Str))
     ),
 
+    // Calls a function on data
+    //FUNCALL  = 64; // Function(*), DATUM... -> DATUM
+    module(termType = 64, name = "applyFunction")(Top.Datum)(
+      fun(arg("f", Top.FunctionArg(1)), arg("value", Top.Datum))
+    ),
 
     //PLUCK    = 33; // Sequence, Pathspec... -> Sequence | OBJECT, Pathspec... -> OBJECT
     module(termType = 33, name = "pluck")(Top.AnyType)(
