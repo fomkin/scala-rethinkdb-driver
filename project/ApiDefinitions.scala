@@ -10,6 +10,9 @@ object ApiDefinitions {
 
   val modules = Seq(
 
+    module(termType = 12, name = "error")(Top.Error)(
+      fun(arg("message", Top.Datum.Str))
+    ),
     module(termType = 169, name = "uuid")(Top.Datum)(fun()),
     module(termType = 13, name = "implicitVar")(Top.Datum)(fun()),
     // TODO hadcode it
@@ -242,6 +245,12 @@ object ApiDefinitions {
       fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
     ),
 
+    //MERGE    = 35; // OBJECT... -> OBJECT | Sequence -> Sequence
+    module(termType = 35, name = "merge")(Top.AnyType)(
+      fun(Top.Datum)(multiarg("objects", Top.Datum)),
+      fun(Top.Datum)(arg("f",  Top.FunctionArg(1)))
+    ),
+
     module(termType = 39, name = "filter", doc =
       """Filter a sequence with either a function or a shortcut
         |object (see API docs for details).  The body of FILTER is
@@ -458,9 +467,8 @@ object ApiDefinitions {
         )
       ),
       module(termType = 41, name = "orderBy")(Top.Sequence)(
-        fun(Top.Sequence)(arg("field", Top.Datum.Str), opt("index", Top.Datum.Str)),
-        fun(Top.Sequence)(arg("ordering", Top.Ordering), opt("index", Top.Ordering)),
-        fun(Top.Sequence)(opt("index", Top.Ordering))
+        fun(Top.Sequence)(multiarg("field", Top.Datum.Str), opt("index", Top.Datum.Str)),
+        fun(Top.Sequence)(multiarg("ordering", Top.Ordering), opt("index", Top.Ordering))
       ),
       module(termType = 73, name = "asc")(Top.Ordering)(
         fun(arg("field", Top.Datum.Str))
