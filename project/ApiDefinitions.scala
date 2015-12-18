@@ -250,6 +250,14 @@ object ApiDefinitions {
       fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
     ),
 
+    //WITHOUT  = 34; // Sequence, Pathspec... -> Sequence | OBJECT, Pathspec... -> OBJECT
+    module(termType = 34, name = "without", doc =
+      """Get a subset of an object by selecting some attributes to discard, or
+        |map that over a sequence.  (Both unpick and without, polymorphic.)
+      """.stripMargin)(Top.AnyType)(
+      fun(Top.Datum)(multiarg("objects", Top.Datum.Str))
+    ),
+
     //MERGE    = 35; // OBJECT... -> OBJECT | Sequence -> Sequence
     module(termType = 35, name = "merge")(Top.AnyType)(
       fun(Top.Datum)(multiarg("objects", Top.Datum)),
@@ -312,6 +320,28 @@ object ApiDefinitions {
           opt("durability", Top.Datum.Str),
           opt("return_changes", Top.Datum.Bool)
         )
+    ),
+
+    // REPLACE  = 55;
+    // StreamSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT |
+    // SingleSelection, Function(1), {non_atomic:BOOL, durability:STRING, return_changes:BOOL} -> OBJECT
+    module(termType = 55, name = "replace", doc =
+      """Replaces all the rows in a selection.  Calls its Function with the row
+        |to be replaced, and then discards it and stores the result of that call.
+      """.stripMargin
+    )(Top.Datum.Obj)(
+      fun(Top.Datum.SingleSelection)(
+        arg("f", Top.FunctionArg(1)),
+        opt("non_atomic", Top.Datum.Bool),
+        opt("durability", Top.Datum.Str),
+        opt("return_changes", Top.Datum.Bool)
+      ),
+      fun(Top.Datum.SingleSelection)(
+        arg("obj", Top.Datum.Obj),
+        opt("non_atomic", Top.Datum.Bool),
+        opt("durability", Top.Datum.Str),
+        opt("return_changes", Top.Datum.Bool)
+      )
     ),
 
     // Table, OBJECT, {conflict:STRING, durability:STRING, return_changes:BOOL} -> OBJECT |
