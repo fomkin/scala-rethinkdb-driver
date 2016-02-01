@@ -382,7 +382,8 @@ object ApiDefinitions {
     genGroupModule(148, "max"),
 
     module(termType = 152, name = "changes")(Top.Sequence.Stream)(
-      fun(Top.Sequence)()
+      fun(Top.Sequence)(),
+      fun(Top.Datum.SingleSelection)()
     ),
 
     //----------------------------------------------------
@@ -512,6 +513,13 @@ object ApiDefinitions {
         fun(arg("field", Top.Datum.Str))
       ),
 
+      //COUNT = 43; // Sequence -> NUMBER | Sequence, DATUM -> NUMBER | Sequence, Function(1) -> NUMBER
+      module(termType = 43, name = "count")(Top.Datum.Num)(
+        fun(Top.Sequence)(),
+        fun(Top.Sequence)(arg("value", Top.Datum)),
+        fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+      ),
+
       //DEFAULT = 92; // Top, Top -> Top
       module(termType = 92, name = "default")(Top.AnyType)(
         fun(Top.Datum)(arg("value", Top))
@@ -544,7 +552,6 @@ object ApiDefinitions {
         DECEMBER = 125;  // -> 12
 
      */
-    //ORDER_BY   = 41; // Sequence, (!STRING | Ordering)..., {index: (!STRING | Ordering)} -> Sequence
   )
 
 
