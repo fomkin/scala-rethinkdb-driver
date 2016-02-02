@@ -382,8 +382,8 @@ object ApiDefinitions {
     genGroupModule(148, "max"),
 
     module(termType = 152, name = "changes")(Top.Sequence.Stream)(
-      fun(Top.Sequence)(),
-      fun(Top.Datum.SingleSelection)()
+      fun(Top.Sequence)(opt("include_initial", Top.Datum.Bool), opt("include_states", Top.Datum.Bool)),
+      fun(Top.Datum.SingleSelection)(opt("include_initial", Top.Datum.Bool), opt("include_states", Top.Datum.Bool))
     ),
 
     //----------------------------------------------------
