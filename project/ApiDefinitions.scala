@@ -16,7 +16,7 @@ object ApiDefinitions {
     module(termType = 169, name = "uuid")(Top.Datum)(fun()),
     module(termType = 13, name = "implicitVar")(Top.Datum)(fun()),
     // TODO hadcode it
-    module(termType = 154, name = "http")(Top.Datum.Obj, Top.Datum.Str)(
+    module(termType = 153, name = "http")(Top.Datum.Obj, Top.Datum.Str)(
       fun(arg("url", Top.Datum.Str))
     ),
 
@@ -518,6 +518,11 @@ object ApiDefinitions {
         fun(Top.Sequence)(),
         fun(Top.Sequence)(arg("value", Top.Datum)),
         fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+      ),
+
+      //ARGS = 154; // ARRAY -> SPECIAL (used to splice arguments)
+      module(termType = 154, name = "args")(Top.Datum)(
+        fun(arg("value", Top.Datum))
       ),
 
       //DEFAULT = 92; // Top, Top -> Top
