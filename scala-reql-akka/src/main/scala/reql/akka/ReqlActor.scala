@@ -15,7 +15,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   import ReqlTcpConnection._
 
   /**
-   * Time to wait for response from RethinkDB  
+   * Time to wait for response from RethinkDB
    * @return
    */
   def queryTimeout: Timeout
@@ -46,13 +46,13 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     atomCallbacks(token) = f
     dbConnection ! message
   }
-  
+
   //---------------------------------------------------------------------------
   //
   //  Private zone
   //
   //---------------------------------------------------------------------------
-  
+
   private[this] class CursorImpl(token: Long) extends Cursor[Data] {
 
     sealed trait CursorState
@@ -66,7 +66,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     case class Foreach(f: Either[ReqlQueryException, Data] ⇒ _) extends CursorState
 
     case class Failed(e: ReqlQueryException) extends CursorState
-    
+
     var state: CursorState = Idle
 
     var data = List.empty[Data]
@@ -103,14 +103,12 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
       checkFail(whenFail = e ⇒ f(Left(e))) {
         if (closed) f(Right(data.reverse))
         else state = Force(f)
-      }  
+      }
     }
 
     def foreach[U](f: Either[ReqlQueryException, Data] ⇒ U): Unit = {
       checkFail(whenFail = e ⇒ f(Left(e))) {
-        if (data == Nil) {
-          f(Left(ReqlQueryException.End))
-        } else {
+        if (data != Nil) {
           data.foreach(x ⇒ f(Right(x)))
           data = Nil
         }
@@ -118,11 +116,11 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
           state = Foreach(f)
           dbConnection ! ContinueQuery(token)
         }
-      }  
+      }
     }
 
     /**
-     * Check cursor is idle and not failed 
+     * Check cursor is idle and not failed
      */
     def checkFail[U1, U2](whenFail: ReqlQueryException ⇒ U1)(whenNot: ⇒ U2): Unit = {
       state match {
@@ -171,7 +169,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   private[this] val atomCallbacks = mutable.Map.empty[Long, AtomCb[Data]]
 
   private[this] val cursorCallbacks = mutable.Map.empty[Long, CursorCb[Data]]
-  
+
   private[this] val activeCursors = mutable.Map.empty[Long, CursorImpl]
 
   @tailrec
@@ -225,9 +223,9 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
                   case None ⇒
                     atomCallbacks.remove(token) foreach { cb ⇒
                       cb(Left(ex))
-                    } 
+                    }
                 }
-            } 
+            }
         }
       case ReqlTcpConnection.ConnectionClosed ⇒
         activeCursors foreach {

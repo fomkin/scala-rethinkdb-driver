@@ -446,6 +446,16 @@ object ApiDefinitions {
       fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
     ),
 
+    //SET_UNION = 90; // ARRAY, ARRAY -> ARRAY
+    module(termType = 90, name = "setUnion")(Top.Arr)(
+      fun(Top.Arr)(arg("x", Top.Arr))
+    ),
+
+    //SET_DIFFERENCE = 91; // ARRAY, ARRAY -> ARRAY
+    module(termType = 91, name = "setDifference")(Top.Arr)(
+      fun(Top.Arr)(arg("x", Top.Arr))
+    ),
+
     // Deletes all the rows in a selection.
     //DELETE   = 54; // StreamSelection, {durability:STRING, return_changes:BOOL} -> OBJECT | SingleSelection -> OBJECT
     module(termType = 54, name = "delete")(Top.Datum.Obj)(
