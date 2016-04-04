@@ -1,6 +1,6 @@
 val commonSettings = Seq(
   organization := "com.github.fomkin",
-  version := "0.2.9",
+  version := "0.2.10",
   scalaVersion := "2.11.7",
   scalacOptions ++= Seq(
     "-deprecation",
@@ -28,7 +28,7 @@ val `scala-reql-pushka` = crossProject.crossType(CrossType.Pure).
   dependsOn(`scala-reql-core`).
   settings(commonSettings:_*).
   settings(
-    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full),
+    addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full),
     libraryDependencies += "com.github.fomkin" %%% "pushka-json" % "0.4.1"
   )
 
@@ -40,7 +40,7 @@ lazy val `scala-reql-akka` = project.
   settings(commonSettings:_*).
   settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.akka" %% "akka-actor" % "2.3.7"
+      "com.typesafe.akka" %% "akka-actor" % "2.4.2"
     )
   )
 
