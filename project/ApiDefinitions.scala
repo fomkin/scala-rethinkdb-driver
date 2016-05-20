@@ -69,6 +69,11 @@ object ApiDefinitions {
       fun(">", Top.Datum)(arg("thn", Top.Datum))
     ),
 
+    // NOT = 23; // BOOL -> BOOL
+    module(termType = 23, name = "not")(Top.Datum.Bool)(
+      fun(arg("a", Top.Datum.Bool))
+    ),
+
     // Executes its first argument, and returns its second argument if it
     // got [true] or its third argument if it got [false] (like an `if`
     // statement).
@@ -280,6 +285,14 @@ object ApiDefinitions {
       fun(Top.Sequence)(arg("x", Top.Datum), opt("default", Top.Datum))
     ),
 
+    // CONCAT_MAP = 40; // Sequence, Function(1) -> Sequence
+    module(termType = 40, name = "concatMap", doc =
+      "Map a function over a sequence and then concatenate the results together."
+    )(Top.Sequence)(
+      // Sequence, Function(1) -> Sequence
+      fun(Top.Sequence)(arg("f", Top.FunctionArg(1)))
+    ),
+
     //BRACKET = 170; // Sequence | OBJECT, NUMBER | STRING -> DATUM
     module(termType = 170, name = "apply")(Top.AnyType)(
       fun(Top.Datum)(arg("field", Top.Datum.Str)),
@@ -310,6 +323,12 @@ object ApiDefinitions {
     )(Top.Datum.Obj)(
         fun(Top.Datum.SingleSelection)(
           arg("f", Top.FunctionArg(1)),
+          opt("non_atomic", Top.Datum.Bool),
+          opt("durability", Top.Datum.Str),
+          opt("return_changes", Top.Datum.Bool)
+        ),
+        fun(Top.Sequence.StreamSelection)(
+          arg("obj", Top.Datum.Obj),
           opt("non_atomic", Top.Datum.Bool),
           opt("durability", Top.Datum.Str),
           opt("return_changes", Top.Datum.Bool)
