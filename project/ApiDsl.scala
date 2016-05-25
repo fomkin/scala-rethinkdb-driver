@@ -1,4 +1,3 @@
-
 sealed trait Top
 
 object Top extends Top {
@@ -11,9 +10,10 @@ object Top extends Top {
     Top.Sequence.Table, Top.PseudoType.Time, Top.PseudoType.Binary
   )
 
-  case object AnyType extends Top
-  
-  sealed trait Datum extends Top
+  sealed trait AnyType extends Top
+  object AnyType extends AnyType
+
+  sealed trait Datum extends AnyType
 
   sealed trait Sequence extends Top
 
@@ -21,17 +21,17 @@ object Top extends Top {
 
   case object Database extends Top
 
-  case class FunctionArg(argsCount: Int) extends Top
+  case class FunctionArg(argsCount: Int) extends AnyType
 
-  case object Function extends Top
-  
+  case object Function extends AnyType
+
   case object Ordering extends Top
 
   case object Pathspec extends Top
 
   case object Error extends Top
 
-  object Datum extends Top {
+  object Datum extends Datum {
 
     case object Null extends Datum
 
@@ -112,7 +112,7 @@ sealed trait ArgOrOpt {
   val name: String
 
   val tpe: Top
-  
+
   def isMulti = false
 }
 
