@@ -168,6 +168,12 @@ object ApiDefinitions {
       )
     ),
 
+    // TABLE_DROP    = 61; // Database, STRING -> OBJECT
+                           // STRING -> OBJECT
+    module(termType = 61, name = "tableDrop")(Top.Datum.Obj)(
+      fun(Top.Database)(arg("name", Top.Datum.Str))
+    ),
+
     // INDEX_CREATE = 75;
     // Table, STRING, Function(1), {multi:BOOL} -> OBJECT
     module(termType = 75, name = "indexCreate")(Top.Datum.Obj)(
