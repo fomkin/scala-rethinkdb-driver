@@ -154,15 +154,17 @@ private class RethinkDbConnectionWorkerActor(
   var suspended = false
 
   def processCommand(command: ReqlConnectionCommand, sender: ActorRef): Unit = {
-
-    import RethinkDbConnectionActor._
-    mapping.put(command.token, sender)
-
     command match {
-      case StartQuery(token, query) => startQuery(token, query)
-      case StopQuery(token) => stopQuery(token)
-      case ContinueQuery(token) => continueQuery(token)
-      case ForgetQuery(token) => mapping.remove(token)
+      case StartQuery(token, query) =>
+        mapping.put(command.token, sender)
+        startQuery(token, query)
+      case StopQuery(token) =>
+        mapping.remove(token)
+        stopQuery(token)
+      case ContinueQuery(token) =>
+        continueQuery(token)
+      case ForgetQuery(token) =>
+        mapping.remove(token)
     }
   }
 
@@ -246,7 +248,7 @@ private class RethinkDbConnectionWorkerActor(
   }
 
   protected def onResponse(token: Long, data: Array[Byte]): Unit = {
-    mapping.remove(token) match {
+    mapping.get(token) match {
       case Some(receiver) =>
         receiver ! Response(token, data)
       case None => log.warning("Received response for forgotten message")
