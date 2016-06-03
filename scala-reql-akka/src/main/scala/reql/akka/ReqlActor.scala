@@ -12,10 +12,11 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
   import ReqlActor._
   import ReqlContext._
-  import ReqlTcpConnection._
+  import RethinkDbConnectionActor._
 
   /**
    * Time to wait for response from RethinkDB
+ *
    * @return
    */
   def queryTimeout: Timeout
@@ -23,6 +24,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   /**
    * The actor implements ReqlTcpConnection protocol. It can be
    * ReqlTcp connection itself or router for connection pool.
+ *
    * @return
    */
   def dbConnection: ActorRef
@@ -189,7 +191,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
   override def unhandled(message: Any): Unit = {
     message match {
-      case ReqlTcpConnection.Response(token, rawData) ⇒
+      case RethinkDbConnectionActor.Response(token, rawData) ⇒
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom[Data] ⇒
             atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
@@ -227,7 +229,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
                 }
             }
         }
-      case ReqlTcpConnection.ConnectionClosed ⇒
+      case RethinkDbConnectionActor.ConnectionClosed ⇒
         activeCursors foreach {
           case (k, v) ⇒
             v.fail(ReqlQueryException.ConnectionError)

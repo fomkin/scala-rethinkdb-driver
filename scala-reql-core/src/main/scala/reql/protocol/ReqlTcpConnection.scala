@@ -11,9 +11,9 @@ import scala.annotation.{switch, tailrec}
  * See specification at
  * http://www.rethinkdb.com/docs/writing-drivers/
  */
-trait ReqlConnection {
+trait RethinkDbConnection {
 
-  import ReqlConnection._
+  import RethinkDbConnection._
 
   //---------------------------------------------------------------------------
   //
@@ -59,6 +59,7 @@ trait ReqlConnection {
    * Process data from RethinkDB server when connection
    * was established and handshake was successful.
    * Decode packets from server and run callback.
+ *
    * @param data Raw data from connection
    */
   protected def processData(data: ByteBuffer): Unit = {
@@ -152,11 +153,11 @@ trait ReqlConnection {
   //
   //---------------------------------------------------------------------------
 
-  private[this] var state: Int = Handshake
+  private var state: Int = Handshake
 
-  private[this] var buffer: ByteBuffer = ByteBuffer.allocate(0)
+  private var buffer: ByteBuffer = ByteBuffer.allocate(0)
 
-  private[this] def send(token: Long, data: ByteBuffer): Unit = {
+  private def send(token: Long, data: ByteBuffer): Unit = {
     data.position(0)
     val buffer = ByteBuffer.
       allocate(HeaderSize + data.capacity).
@@ -169,7 +170,7 @@ trait ReqlConnection {
   }
 }
 
-private object ReqlConnection {
+private object RethinkDbConnection {
 
   val Handshake = 0
 
