@@ -174,6 +174,16 @@ object ApiDefinitions {
       fun(Top.Database)(arg("name", Top.Datum.Str))
     ),
 
+    // Called on a table, waits for that table to be ready for read/write operations.
+    // Called on a database, waits for all of the tables in the database to be ready.
+    // Returns the corresponding row or rows from the `rethinkdb.table_status` table.
+    // WAIT    = 177; // Table -> OBJECT
+    //                // Database -> OBJECT
+    module(termType = 177, name = "waitToBeReady")(Top.Datum.Obj)(
+      fun(Top.Sequence.Table)(),
+      fun(Top.Database)()
+    ),
+
     // INDEX_CREATE = 75;
     // Table, STRING, Function(1), {multi:BOOL} -> OBJECT
     module(termType = 75, name = "indexCreate")(Top.Datum.Obj)(

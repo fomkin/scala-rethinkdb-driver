@@ -1,6 +1,6 @@
 package reql.akka
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef}
 import akka.util.Timeout
 import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.util.Random
 
-trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
+trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
 
   import ReqlActor._
   import ReqlContext._
@@ -16,7 +16,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
   /**
    * Time to wait for response from RethinkDB
- *
+   *
    * @return
    */
   def queryTimeout: Timeout
@@ -24,7 +24,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   /**
    * The actor implements ReqlTcpConnection protocol. It can be
    * ReqlTcp connection itself or router for connection pool.
- *
+   *
    * @return
    */
   def dbConnection: ActorRef
@@ -36,17 +36,11 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
   //---------------------------------------------------------------------------
 
   def runCursorQuery[U](query: ReqlArg)(f: CursorCb[Data]): Unit = {
-    val token = Random.nextLong()
-    val message = StartQuery(token, query)
-    cursorCallbacks(token) = f
-    dbConnection ! message
+    self ! Message.RunCursorQuery(query, f)
   }
 
   def runAtomQuery[U](query: ReqlArg)(f: AtomCb[Data]): Unit = {
-    val token = Random.nextLong()
-    val message = StartQuery(token, query)
-    atomCallbacks(token) = f
-    dbConnection ! message
+    self ! Message.RunAtomQuery(query, f)
   }
 
   //---------------------------------------------------------------------------
@@ -168,6 +162,14 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
     }
   }
 
+  private[this] object Message {
+
+    case class RunCursorQuery(query: ReqlArg, callback: CursorCb[Data])
+
+    case class RunAtomQuery(query: ReqlArg, callback: AtomCb[Data])
+
+  }
+
   private[this] val atomCallbacks = mutable.Map.empty[Long, AtomCb[Data]]
 
   private[this] val cursorCallbacks = mutable.Map.empty[Long, CursorCb[Data]]
@@ -185,28 +187,53 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
 
   private[this] def registerCursorForPartialResponse(token: Long): CursorImpl = {
     val cursor = new CursorImpl(token)
-    cursorCallbacks.get(token).foreach(cb ⇒ cb(cursor))
+    if (cursorCallbacks.get(token).isEmpty) {
+      log.warning("Haven't callback for cursor with token {}", token)
+    }
     cursor
+  }
+
+  @tailrec
+  private def createToken(exists: Long ⇒ Boolean): Long = {
+    Random.nextLong() match {
+      case token if !exists(token) ⇒ token
+      case _ ⇒ createToken(exists)
+    }
   }
 
   override def unhandled(message: Any): Unit = {
     message match {
+      case Message.RunCursorQuery(query, callback) ⇒
+        val token = createToken(cursorCallbacks.contains)
+        val message = StartQuery(token, query)
+        cursorCallbacks(token) = callback
+        dbConnection ! message
+      case Message.RunAtomQuery(query, callback) ⇒
+        val token = createToken(atomCallbacks.contains)
+        val message = StartQuery(token, query)
+        atomCallbacks(token) = callback
+        dbConnection ! message
       case RethinkDbConnectionActor.Response(token, rawData) ⇒
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom[Data] ⇒
             atomCallbacks.remove(token).foreach(cb ⇒ cb(Right(pr.data)))
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Sequence[Data] if pr.partial ⇒
-            val cursor = activeCursors.getOrElseUpdate(
-              token, registerCursorForPartialResponse(token))
+            val cursor = activeCursors.getOrElseUpdate(token, registerCursorForPartialResponse(token))
             pr.xs.foreach(cursor.append(_, close = false))
+            dbConnection ! ContinueQuery(token)
           case pr: ParsedResponse.Sequence[Data] if !pr.partial ⇒
             activeCursors.get(token) match {
-              case Some(cursor) ⇒ appendSequenceToCursorAndClose(cursor, pr.xs.toList)
-              case None ⇒ cursorCallbacks.get(token) foreach { cb ⇒
-                val cursor = new CursorImpl(token)
+              case Some(cursor) ⇒
                 appendSequenceToCursorAndClose(cursor, pr.xs.toList)
-                cb(cursor)
+                cursorCallbacks.remove(token) foreach { cb ⇒ cb(cursor) }
+              case None ⇒ cursorCallbacks.get(token) match {
+                case Some(cb) ⇒
+                  val cursor = new CursorImpl(token)
+                  appendSequenceToCursorAndClose(cursor, pr.xs.toList)
+                  cb(cursor)
+                case None ⇒
+                  log.warning("Haven't a callback for non-partial response. Token is {}", token)
               }
             }
             dbConnection ! ForgetQuery(token)
@@ -216,6 +243,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
             activeCursors.remove(token) match {
               case Some(cursor) ⇒
                 cursor.fail(ex)
+                cursorCallbacks.remove(token)
               case None ⇒
                 cursorCallbacks.remove(token) match {
                   case Some(cb) ⇒
@@ -223,8 +251,9 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] {
                     cursor.fail(ex)
                     cb(cursor)
                   case None ⇒
-                    atomCallbacks.remove(token) foreach { cb ⇒
-                      cb(Left(ex))
+                    atomCallbacks.remove(token) match {
+                      case Some(cb) ⇒ cb(Left(ex))
+                      case None ⇒ log.warning("Haven't a callback for error response. Token is {}", token)
                     }
                 }
             }

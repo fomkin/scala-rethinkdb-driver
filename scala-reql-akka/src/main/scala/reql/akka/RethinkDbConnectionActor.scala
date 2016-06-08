@@ -138,10 +138,6 @@ private class RethinkDbConnectionWorkerActor(
   case object Ack extends Event
   case class SendBytes(data: ByteString)
 
-  tcpConnection ! Register(self, keepOpenOnPeerClosed = true)
-  sendBytes(createHandshakeBuffer(authKey))
-  context watch tcpConnection
-
   val mapping = mutable.Map.empty[Long, ActorRef]
   var storage = Vector.empty[ByteString]
   var stored = 0L
@@ -254,4 +250,8 @@ private class RethinkDbConnectionWorkerActor(
       case None => log.warning("Received response for forgotten message")
     }
   }
+
+  tcpConnection ! Register(self, keepOpenOnPeerClosed = true)
+  sendBytes(createHandshakeBuffer(authKey))
+  context watch tcpConnection
 }
