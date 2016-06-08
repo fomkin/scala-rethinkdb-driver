@@ -187,8 +187,9 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
 
   private[this] def registerCursorForPartialResponse(token: Long): CursorImpl = {
     val cursor = new CursorImpl(token)
-    if (cursorCallbacks.get(token).isEmpty) {
-      log.warning("Haven't callback for cursor with token {}", token)
+    cursorCallbacks.get(token) match {
+      case Some(cb) ⇒ cb(cursor)
+      case None ⇒ log.warning("Haven't callback for cursor with token {}", token)
     }
     cursor
   }
@@ -226,7 +227,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
             activeCursors.get(token) match {
               case Some(cursor) ⇒
                 appendSequenceToCursorAndClose(cursor, pr.xs.toList)
-                cursorCallbacks.remove(token) foreach { cb ⇒ cb(cursor) }
+                cursorCallbacks.remove(token)
               case None ⇒ cursorCallbacks.get(token) match {
                 case Some(cb) ⇒
                   val cursor = new CursorImpl(token)
