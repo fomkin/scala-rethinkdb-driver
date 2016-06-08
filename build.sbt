@@ -1,6 +1,6 @@
 val commonSettings = Seq(
   organization := "com.github.fomkin",
-  version := "0.3.2",
+  version := "0.3.3",
   scalaVersion := "2.11.7",
   scalacOptions ++= Seq(
     "-deprecation",
