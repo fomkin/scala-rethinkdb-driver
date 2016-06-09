@@ -144,11 +144,6 @@ private class RethinkDbConnectionWorkerActor(
   var transferred = 0L
   var closing = false
 
-  val maxStored = 10000000L
-  val highWatermark = maxStored * 5 / 10
-  val lowWatermark = maxStored * 3 / 10
-  var suspended = false
-
   def processCommand(command: ReqlConnectionCommand, sender: ActorRef): Unit = {
     command match {
       case StartQuery(token, query) =>
@@ -197,15 +192,6 @@ private class RethinkDbConnectionWorkerActor(
   private def buffer(data: ByteString): Unit = {
     storage :+= data
     stored += data.size
-
-    if (stored > maxStored) {
-      log.warning(s"Drop connection to Rethinkdb (buffer overrun)")
-      context stop self
-    } else if (stored > highWatermark) {
-      log.debug(s"Suspending reading")
-      tcpConnection ! SuspendReading
-      suspended = true
-    }
   }
 
   private def acknowledge(): Unit = {
@@ -215,12 +201,6 @@ private class RethinkDbConnectionWorkerActor(
     stored -= size
     transferred += size
     storage = storage drop 1
-
-    if (suspended && stored < lowWatermark) {
-      log.debug("Resuming reading")
-      tcpConnection ! ResumeReading
-      suspended = false
-    }
 
     if (storage.isEmpty) {
       if (closing) {
