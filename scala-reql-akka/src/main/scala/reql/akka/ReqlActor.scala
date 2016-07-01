@@ -6,7 +6,7 @@ import reql.dsl.{Cursor, ReqlArg, ReqlContext, ReqlQueryException}
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.util.Random
+import scala.concurrent.forkjoin.ThreadLocalRandom
 
 trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
 
@@ -95,6 +95,11 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
       else throw CursorException("Cursor already closed")
     }
 
+    def forget(): Unit = {
+      closed = true
+      dbConnection ! ForgetQuery(token)
+    }
+
     def force[U](f: Either[ReqlQueryException, Seq[Data]] ⇒ U): Unit = {
       checkFail(whenFail = e ⇒ f(Left(e))) {
         if (closed) f(Right(data.reverse))
@@ -134,23 +139,16 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
       case Foreach(f) ⇒ f(Left(exception))
       case Next(f) ⇒ f(Left(exception))
       case Force(f) ⇒ f(Left(exception))
-      case Failed(_) ⇒ // We cant fail twice!
+      case Failed(e) ⇒ // We cant fail twice!
+        log.warning(s"Failed again: ${e.toString}")
     }
 
     def append(value: Data, close: Boolean): Unit = {
-      // Before apply
-      if (close) closed = true
-      // Apply
       state match {
         case Next(f) ⇒ f(Right(value))
-        case Foreach(f) ⇒
-          f(Right(value))
-          if (!close) {
-            dbConnection ! ContinueQuery(token)
-          }
+        case Foreach(f) ⇒ f(Right(value))
         case _ ⇒ data ::= value
       }
-      // After apply
       if (close) {
         state match {
           case Next(f) ⇒ f(Left(ReqlQueryException.End))
@@ -177,43 +175,36 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
   private[this] val activeCursors = mutable.Map.empty[Long, CursorImpl]
 
   @tailrec
-  private[this] def appendSequenceToCursorAndClose(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
-    case Nil ⇒ cursor.close()
-    case x :: Nil ⇒ cursor.append(x, close = true)
+  private[this] def appendSequenceToCursorAndForget(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
+    case Nil ⇒ cursor.forget()
     case x :: xs ⇒
-      cursor.append(x, close = false)
-      appendSequenceToCursorAndClose(cursor, xs)
+      cursor.append(x, close = xs.isEmpty)
+      appendSequenceToCursorAndForget(cursor, xs)
   }
 
   private[this] def registerCursorForPartialResponse(token: Long): CursorImpl = {
     val cursor = new CursorImpl(token)
-    cursorCallbacks.get(token) match {
+    cursorCallbacks.remove(token) match {
       case Some(cb) ⇒ cb(cursor)
       case None ⇒ log.warning("Haven't callback for cursor with token {}", token)
     }
     cursor
   }
 
-  @tailrec
-  private def createToken(exists: Long ⇒ Boolean): Long = {
-    Random.nextLong() match {
-      case token if !exists(token) ⇒ token
-      case _ ⇒ createToken(exists)
-    }
-  }
+  private def Random = ThreadLocalRandom.current()
 
   override def unhandled(message: Any): Unit = {
     message match {
       case Message.RunCursorQuery(query, callback) ⇒
-        val token = createToken(cursorCallbacks.contains)
-        val message = StartQuery(token, query)
+        val token = Random.nextLong()
+        val sendMessage = StartQuery(token, query)
         cursorCallbacks(token) = callback
-        dbConnection ! message
+        dbConnection ! sendMessage
       case Message.RunAtomQuery(query, callback) ⇒
-        val token = createToken(atomCallbacks.contains)
-        val message = StartQuery(token, query)
+        val token = Random.nextLong()
+        val sendMessage = StartQuery(token, query)
         atomCallbacks(token) = callback
-        dbConnection ! message
+        dbConnection ! sendMessage
       case RethinkDbConnectionActor.Response(token, rawData) ⇒
         parseResponse(rawData) match {
           case pr: ParsedResponse.Atom[Data] ⇒
@@ -224,20 +215,20 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
             pr.xs.foreach(cursor.append(_, close = false))
             dbConnection ! ContinueQuery(token)
           case pr: ParsedResponse.Sequence[Data] if !pr.partial ⇒
-            activeCursors.get(token) match {
+            def xs = pr.xs.toList
+            activeCursors.remove(token) match {
               case Some(cursor) ⇒
-                appendSequenceToCursorAndClose(cursor, pr.xs.toList)
-                cursorCallbacks.remove(token)
-              case None ⇒ cursorCallbacks.get(token) match {
+                // A STOP query should be sent only to close a cursor that hasn't retrieved all his data yet.
+                appendSequenceToCursorAndForget(cursor, xs)
+              case None ⇒ cursorCallbacks.remove(token) match {
                 case Some(cb) ⇒
                   val cursor = new CursorImpl(token)
-                  appendSequenceToCursorAndClose(cursor, pr.xs.toList)
+                  appendSequenceToCursorAndForget(cursor, xs)
                   cb(cursor)
                 case None ⇒
                   log.warning("Haven't a callback for non-partial response. Token is {}", token)
               }
             }
-            dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Error ⇒
             val ex = ReqlQueryException.ReqlErrorResponse(pr.tpe, pr.text)
             dbConnection ! ForgetQuery(token)
