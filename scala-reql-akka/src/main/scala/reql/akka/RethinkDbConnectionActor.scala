@@ -5,6 +5,7 @@ import akka.io.{IO, Tcp}
 import akka.util.ByteString
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import reql.dsl.ReqlArg
 import reql.protocol.RethinkDbConnection
@@ -59,8 +60,7 @@ class RethinkDbConnectionActor(remote: InetSocketAddress,
 
   import Tcp._
   import RethinkDbConnectionActor._
-  import context.system
-  import context.dispatcher
+  import context.{dispatcher, system}
 
   var pendingCommands = List.empty[(ReqlConnectionCommand, ActorRef)]
   var workers = List.empty[ActorRef]
@@ -92,7 +92,7 @@ class RethinkDbConnectionActor(remote: InetSocketAddress,
             authKey,
             tcpConnection
         )
-        system.actorOf(props)
+        system.actorOf(props, "connection-worker")
       }
       // Reset connection attempts counter
       connectionAttempt = 0
@@ -135,19 +135,18 @@ private class RethinkDbConnectionWorkerActor(
   import Tcp._
   import RethinkDbConnectionActor._
 
-  case object Ack extends Event
+  case class Ack(id: Long) extends Event
   case class SendBytes(data: ByteString)
 
   val mapping = mutable.Map.empty[Long, ActorRef]
-  var storage = Vector.empty[ByteString]
-  var stored = 0L
-  var transferred = 0L
+  val storage = new mutable.Queue[ByteString]()
+
   var closing = false
 
   def processCommand(command: ReqlConnectionCommand, sender: ActorRef): Unit = {
     command match {
       case StartQuery(token, query) =>
-        mapping.put(command.token, sender)
+        mapping.put(token, sender)
         startQuery(token, query)
       case StopQuery(token) =>
         mapping.remove(token)
@@ -159,61 +158,43 @@ private class RethinkDbConnectionWorkerActor(
     }
   }
 
-  val writing: Receive = {
+  var counter: Long = 0
+  def receive: Receive = {
     case command: ReqlConnectionCommand =>
       processCommand(command, sender())
-    case SendBytes(data) =>
-      // When some data sent, push
-      // all new outgoing packets to
-      // storage
-      buffer(data)
+    case SendBytes(data) if storage.isEmpty =>
+      storage.enqueue(data)
+      tcpConnection ! Write(data, Ack(counter))
+    case SendBytes(data) => storage.enqueue(data)
+    case ack: Ack => acknowledge(ack)
     case Received(data) => processData(data.toByteBuffer)
-    case Ack => acknowledge()
-    case PeerClosed => closing = true
-  }
-
-  val pending: Receive = {
-    case command: ReqlConnectionCommand =>
-      processCommand(command, sender())
-    case SendBytes(data) =>
-      buffer(data)
-      tcpConnection ! Write(data, Ack)
-      context.become(writing, discardOld = false)
-    case Received(data) =>
-      processData(data.toByteBuffer)
     case PeerClosed =>
       log.info("Connection closed by peer")
       mapping.values.foreach(_ ! ConnectionClosed)
       context stop self
+    case Terminated(x) ⇒ log.error(s"$x is terminated")
   }
 
-  def receive: Receive = pending
+  private def acknowledge(ack: Ack): Unit = {
+    if (ack.id == counter) {
+      storage.dequeue()
+      counter += 1
 
-  private def buffer(data: ByteString): Unit = {
-    storage :+= data
-    stored += data.size
-  }
-
-  private def acknowledge(): Unit = {
-    require(storage.nonEmpty, "storage was empty")
-
-    val size = storage(0).size
-    stored -= size
-    transferred += size
-    storage = storage drop 1
-
-    if (storage.isEmpty) {
-      if (closing) {
-        log.info("Connection closed by peer")
-        mapping.values.foreach(_ ! ConnectionClosed)
-        context stop self
-      } else context.unbecome()
-    } else {
-      tcpConnection ! Write(storage(0), Ack)
-    }
+      storage.headOption match {
+        case Some(nextData) ⇒ tcpConnection ! Write(nextData, Ack(counter))
+        case None if closing ⇒
+          log.info("Connection closed by peer")
+          mapping.values.foreach(_ ! ConnectionClosed)
+          context stop self
+        case _ ⇒
+      }
+    } else if (ack.id > counter) {
+      log.warning(s"Expected ack with id ${ack.id}, but got $counter. Ignoring.")
+    } // Ignore old queries acknowledge: ack.id < counter
   }
 
   protected def sendBytes(bytes: ByteBuffer): Unit = {
+    bytes.position(0)
     val data = ByteString(bytes)
     self ! SendBytes(data)
   }
@@ -227,7 +208,9 @@ private class RethinkDbConnectionWorkerActor(
     mapping.get(token) match {
       case Some(receiver) =>
         receiver ! Response(token, data)
-      case None => log.warning("Received response for forgotten message")
+      case None =>
+        // Sometimes https://github.com/rethinkdb/rethinkdb/issues/3296#issuecomment-79975399 is occurred
+        log.warning(s"Received response for forgotten message: $token, ${new String(data, StandardCharsets.UTF_8)}")
     }
   }
 
