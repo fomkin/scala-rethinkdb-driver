@@ -9,6 +9,7 @@ object BinaryOps {
 }
 
 final class BinaryOps(val self: Binary) extends AnyVal {
+import BinaryOps._
 
 }
          

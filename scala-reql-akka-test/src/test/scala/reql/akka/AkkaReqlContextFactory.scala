@@ -1,6 +1,7 @@
 package reql.akka
 
 import java.net.InetSocketAddress
+import java.text.ParseException
 
 import akka.actor.{ActorRef, ActorSystem, Props}
 import akka.pattern.{ask, pipe}
@@ -17,7 +18,11 @@ object AkkaReqlContextFactory extends ReqlContextFactory {
 
   private lazy val system: ActorSystem = ActorSystem("akka-reql-context-factory")
   private lazy val dbConnection: ActorRef = {
-    val addr = extractAddress(System.getenv("RETHINKDB_SERVER"))
+    val server = System.getenv("RETHINKDB_SERVER")
+    if (server == null) {
+      throw new ParseException("Please specify RETHINKDB_SERVER environment variable", 0)
+    }
+    val addr = extractAddress(server)
     system.actorOf(RethinkDbConnectionActor.props(addr))
   }
 

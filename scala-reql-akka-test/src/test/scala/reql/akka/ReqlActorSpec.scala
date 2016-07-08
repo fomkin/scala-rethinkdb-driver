@@ -2,16 +2,14 @@ package reql.akka
 
 import reql.ReqlContextSpec
 
-import scala.concurrent.Future
-
 class ReqlActorSpec extends ReqlContextSpec(AkkaReqlContextFactory) {
   "test" in withContext { context ⇒
     import context._
-    import context.toRunOps
 
-    context.runAtomQuery()
-    Future.successful {
-      assert(true == true)
+    val query = r.db("test").tableList
+    query.runC.map { xs ⇒
+      println(s"Tables is: $xs")
+      assert(true)
     }
   }
 }

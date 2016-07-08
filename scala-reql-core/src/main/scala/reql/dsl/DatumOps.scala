@@ -24,6 +24,7 @@ object DatumOps {
 }
 
 final class DatumOps(val self: Datum) extends AnyVal {
+import DatumOps._
   
   /**
 

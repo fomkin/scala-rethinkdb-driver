@@ -12,6 +12,7 @@ object ArrOps {
 }
 
 final class ArrOps(val self: Arr) extends AnyVal {
+import ArrOps._
   
   /**
 

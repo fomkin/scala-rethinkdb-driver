@@ -9,6 +9,7 @@ object StrOps {
 }
 
 final class StrOps(val self: Str) extends AnyVal {
+import StrOps._
 
 }
          

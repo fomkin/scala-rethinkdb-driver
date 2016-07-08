@@ -11,6 +11,7 @@ object ObjOps {
 }
 
 final class ObjOps(val self: Obj) extends AnyVal {
+import ObjOps._
   
   /**
 

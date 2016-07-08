@@ -32,6 +32,7 @@ object ReqlTopLevelApi {
 
 // Generated code. Do not modify|
 class ReqlTopLevelApi {
+import ReqlTopLevelApi._
   
   /**
 

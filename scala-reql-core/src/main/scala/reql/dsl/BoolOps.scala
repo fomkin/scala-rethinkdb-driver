@@ -10,6 +10,7 @@ object BoolOps {
 }
 
 final class BoolOps(val self: Bool) extends AnyVal {
+import BoolOps._
   
   /**
 

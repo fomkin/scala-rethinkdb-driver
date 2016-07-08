@@ -9,6 +9,7 @@ object ErrorOps {
 }
 
 final class ErrorOps(val self: Error) extends AnyVal {
+import ErrorOps._
 
 }
          

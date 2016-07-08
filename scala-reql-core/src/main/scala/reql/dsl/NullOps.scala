@@ -9,6 +9,7 @@ object NullOps {
 }
 
 final class NullOps(val self: Null) extends AnyVal {
+import NullOps._
 
 }
          

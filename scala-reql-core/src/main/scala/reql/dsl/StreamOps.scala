@@ -9,6 +9,7 @@ object StreamOps {
 }
 
 final class StreamOps(val self: Stream) extends AnyVal {
+import StreamOps._
 
 }
          

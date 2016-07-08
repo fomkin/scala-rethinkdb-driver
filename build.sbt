@@ -19,7 +19,14 @@ val commonSettings = Seq(
 
 val `scala-reql-core` = crossProject.crossType(CrossType.Pure).
   settings(commonSettings:_*).
-  settings(sourceGenerators in Compile <+= (sourceDirectory in Compile).map { f ⇒ ApiGenerator(f) } )
+  // sourceGenerators will create duplicate classes in src, .js and .jvm projects,
+  // so we'll see duplicate errors
+  settings({
+    compile in Compile <<= (compile in Compile, baseDirectory in Compile) { (compile, baseDirectory) ⇒
+      ApiGenerator(baseDirectory / ".." / "src" / "main" / "scala")
+      compile
+    }
+  })
 
 lazy val `scala-reql-core-js` = `scala-reql-core`.js
 lazy val `scala-reql-core-jvm` = `scala-reql-core`.jvm

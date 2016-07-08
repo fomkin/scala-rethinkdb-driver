@@ -12,6 +12,7 @@ object NumOps {
 }
 
 final class NumOps(val self: Num) extends AnyVal {
+import NumOps._
   
   /**
 

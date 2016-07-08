@@ -9,6 +9,7 @@ object FunctionOps {
 }
 
 final class FunctionOps(val self: Function) extends AnyVal {
+import FunctionOps._
 
 }
          

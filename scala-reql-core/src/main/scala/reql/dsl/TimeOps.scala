@@ -22,6 +22,7 @@ object TimeOps {
 }
 
 final class TimeOps(val self: Time) extends AnyVal {
+import TimeOps._
   
   /**
    * Returns seconds since epoch in UTC given a time.
