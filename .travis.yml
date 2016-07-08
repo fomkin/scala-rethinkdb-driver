@@ -1,0 +1,7 @@
+sudo: false
+language: scala
+scala:
+   - 2.11.7
+script: sbt -J-XX:MaxPermSize=1024M test
+jdk:
+  - oraclejdk8 # Akka 2.4+ requires JDK 8

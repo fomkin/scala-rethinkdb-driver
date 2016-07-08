@@ -1,6 +1,6 @@
 val commonSettings = Seq(
   organization := "com.github.fomkin",
-  version := "0.3.4",
+  version := "0.3.5-SNAPSHOT",
   scalaVersion := "2.11.7",
   scalacOptions ++= Seq(
     "-deprecation",
@@ -19,7 +19,14 @@ val commonSettings = Seq(
 
 val `scala-reql-core` = crossProject.crossType(CrossType.Pure).
   settings(commonSettings:_*).
-  settings(sourceGenerators in Compile <+= sourceManaged in Compile map ApiGenerator)
+  // sourceGenerators will create duplicate classes in src, .js and .jvm projects,
+  // so we'll see duplicate errors
+  settings({
+    compile in Compile <<= (compile in Compile, baseDirectory in Compile) { (compile, baseDirectory) ⇒
+      ApiGenerator(baseDirectory / ".." / "src" / "main" / "scala")
+      compile
+    }
+  })
 
 lazy val `scala-reql-core-js` = `scala-reql-core`.js
 lazy val `scala-reql-core-jvm` = `scala-reql-core`.jvm
@@ -42,6 +49,13 @@ lazy val `scala-reql-akka` = project.
     libraryDependencies ++= Seq(
       "com.typesafe.akka" %% "akka-actor" % "2.4.2"
     )
+  )
+
+lazy val `scala-reql-akka-test` = project.
+  dependsOn(`scala-reql-akka`, `scala-reql-pushka-jvm`).
+  settings(commonSettings:_*).
+  settings(
+    libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.0-RC1" % "test"
   )
 
 publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
