@@ -143,19 +143,21 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
         log.warning(s"Failed again: ${e.toString}")
     }
 
-    def append(value: Data, close: Boolean): Unit = {
+    def append(value: Data): Unit = {
       state match {
         case Next(f) ⇒ f(Right(value))
         case Foreach(f) ⇒ f(Right(value))
         case _ ⇒ data ::= value
       }
-      if (close) {
-        state match {
-          case Next(f) ⇒ f(Left(ReqlQueryException.End))
-          case Foreach(f) ⇒ f(Left(ReqlQueryException.End))
-          case Force(f) ⇒ f(Right(data.reverse))
-          case _ ⇒ // Do nothing
-        }
+    }
+
+    def closeAndNotifyEnd(): Unit = {
+      closed = true
+      state match {
+        case Next(f) ⇒ f(Left(ReqlQueryException.End))
+        case Foreach(f) ⇒ f(Left(ReqlQueryException.End))
+        case Force(f) ⇒ f(Right(data.reverse))
+        case _ ⇒ // Do nothing
       }
     }
   }
@@ -176,9 +178,11 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
 
   @tailrec
   private[this] def appendSequenceToCursorAndForget(cursor: CursorImpl, tail: List[Data]): Unit = tail match {
-    case Nil ⇒ cursor.forget()
+    case Nil ⇒
+      cursor.closeAndNotifyEnd()
+      cursor.forget()
     case x :: xs ⇒
-      cursor.append(x, close = xs.isEmpty)
+      cursor.append(x)
       appendSequenceToCursorAndForget(cursor, xs)
   }
 
@@ -212,7 +216,7 @@ trait ReqlActor[Data] extends Actor with ReqlContext[Data] with ActorLogging {
             dbConnection ! ForgetQuery(token)
           case pr: ParsedResponse.Sequence[Data] if pr.partial ⇒
             val cursor = activeCursors.getOrElseUpdate(token, registerCursorForPartialResponse(token))
-            pr.xs.foreach(cursor.append(_, close = false))
+            pr.xs.foreach(cursor.append)
             dbConnection ! ContinueQuery(token)
           case pr: ParsedResponse.Sequence[Data] if !pr.partial ⇒
             def xs = pr.xs.toList

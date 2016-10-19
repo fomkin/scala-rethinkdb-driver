@@ -51,7 +51,8 @@ object PushkaReqlContext extends ReqlEntryPoint {
         }
       }
     case Ast.Str(s) ⇒ toStr(s)
-    case Ast.Num(n) ⇒ toNum(n)
+    case Ast.Num(n) if n.contains('.') ⇒ toNum(n.toDouble)
+    case Ast.Num(n) ⇒ toNum(n.toInt)
     case Ast.Arr(xs) ⇒ array(xs.toSeq.map(astToDatum):_*)
     case Ast.False ⇒ toBool(value = false)
     case Ast.True ⇒ toBool(value = true)

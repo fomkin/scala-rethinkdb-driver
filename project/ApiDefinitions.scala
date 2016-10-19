@@ -10,6 +10,10 @@ object ApiDefinitions {
 
   val modules = Seq(
 
+    module(termType = 42, name = "distinct")(Top.Sequence)(
+      fun(Top.Sequence)()
+    ),
+
     module(termType = 12, name = "error")(Top.Error)(
       fun(arg("message", Top.Datum.Str))
     ),
